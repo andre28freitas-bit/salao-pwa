@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { isConfigured, supabase } from './lib/supabase'
+import { BrowserMultiFormatReader } from '@zxing/browser'
 
 type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
@@ -67,13 +68,19 @@ export default function App(){
   const [clientQuery,setClientQuery]=useState('')
   const [stockQuery,setStockQuery]=useState('')
   const [toast,setToast]=useState('')
+  const [passwordRecovery,setPasswordRecovery]=useState(false)
 
   const manager = membership?.role==='owner' || membership?.role==='manager'
 
   useEffect(()=>{
     if(!isConfigured){ setLoading(false); return }
+    const resetFromUrl=new URLSearchParams(window.location.search).get('reset')==='1'
+    if(resetFromUrl) setPasswordRecovery(true)
     supabase.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false)})
-    const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>setSession(next))
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((event,next)=>{
+      setSession(next)
+      if(event==='PASSWORD_RECOVERY') setPasswordRecovery(true)
+    })
     return ()=>subscription.unsubscribe()
   },[])
 
@@ -145,6 +152,7 @@ export default function App(){
 
   if(loading) return <div className="splash"><div className="brandMark">S</div><p>A carregar…</p></div>
   if(!isConfigured) return <SetupScreen />
+  if(session && (passwordRecovery || session.user.user_metadata?.needs_password===true)) return <PasswordResetScreen inviteSetup={session.user.user_metadata?.needs_password===true} onDone={()=>{ setPasswordRecovery(false); const u=new URL(window.location.href); u.searchParams.delete('reset'); window.history.replaceState({},'',u.pathname+u.search+u.hash) }} onToast={showToast} />
   if(!session) return <AuthScreen onToast={showToast} />
   if(!membership) return <Onboarding onDone={loadMembership} onToast={showToast} />
 
@@ -182,12 +190,34 @@ function SetupScreen(){
 }
 
 function AuthScreen({onToast}:{onToast:(m:string)=>void}){
-  const [mode,setMode]=useState<'login'|'signup'>('login'); const [busy,setBusy]=useState(false)
-  async function submit(e:FormEvent<HTMLFormElement>){ e.preventDefault(); setBusy(true); const fd=new FormData(e.currentTarget); const email=String(fd.get('email')||''); const password=String(fd.get('password')||''); const name=String(fd.get('name')||'')
+  const [mode,setMode]=useState<'login'|'signup'|'forgot'>('login'); const [busy,setBusy]=useState(false)
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault(); setBusy(true); const fd=new FormData(e.currentTarget); const email=String(fd.get('email')||'').trim(); const password=String(fd.get('password')||''); const name=String(fd.get('name')||'')
+    if(mode==='forgot'){
+      const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin})
+      setBusy(false); if(error) onToast(error.message); else onToast('Email enviado. Abre o link para definires uma nova password.'); return
+    }
     const result=mode==='login' ? await supabase.auth.signInWithPassword({email,password}) : await supabase.auth.signUp({email,password,options:{data:{full_name:name}}})
     setBusy(false); if(result.error) onToast(result.error.message); else if(mode==='signup' && !result.data.session) onToast('Conta criada. Confirma o email e depois inicia sessão.')
   }
-  return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><div><div className="eyebrow">SALÃO</div><h1>{mode==='login'?'Entrar':'Criar conta'}</h1><p className="muted">Agenda, clientes e stock num só lugar.</p></div><form onSubmit={submit} className="formStack">{mode==='signup'&&<label>Nome<input name="name" required placeholder="O teu nome" /></label>}<label>Email<input name="email" type="email" required autoComplete="email" /></label><label>Password<input name="password" type="password" minLength={6} required autoComplete={mode==='login'?'current-password':'new-password'} /></label><button className="primary full" disabled={busy}>{busy?'A processar…':mode==='login'?'Entrar':'Criar conta'}</button></form><button className="textButton" onClick={()=>setMode(mode==='login'?'signup':'login')}>{mode==='login'?'Ainda não tenho conta':'Já tenho conta'}</button></div></div>
+  return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><div><div className="eyebrow">SALÃO</div><h1>{mode==='login'?'Entrar':mode==='signup'?'Criar conta':'Recuperar password'}</h1><p className="muted">{mode==='forgot'?'Indica o teu email e enviamos um link para criares uma nova password.':'Agenda, clientes e stock num só lugar.'}</p></div><form onSubmit={submit} className="formStack">{mode==='signup'&&<label>Nome<input name="name" required placeholder="O teu nome" /></label>}<label>Email<input name="email" type="email" required autoComplete="email" /></label>{mode!=='forgot'&&<label>Password<input name="password" type="password" minLength={6} required autoComplete={mode==='login'?'current-password':'new-password'} /></label>}<button className="primary full" disabled={busy}>{busy?'A processar…':mode==='login'?'Entrar':mode==='signup'?'Criar conta':'Enviar link de recuperação'}</button></form>{mode==='login'&&<button className="textButton" onClick={()=>setMode('forgot')}>Esqueci-me da password</button>}<button className="textButton" onClick={()=>setMode(mode==='login'?'signup':'login')}>{mode==='login'?'Ainda não tenho conta':mode==='signup'?'Já tenho conta':'Voltar ao login'}</button></div></div>
+}
+
+function PasswordResetScreen({inviteSetup,onDone,onToast}:{inviteSetup:boolean;onDone:()=>void;onToast:(m:string)=>void}){
+  const [busy,setBusy]=useState(false)
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault(); const fd=new FormData(e.currentTarget); const password=String(fd.get('password')||''); const confirm=String(fd.get('confirm')||'')
+    if(password.length<6) return onToast('A password deve ter pelo menos 6 caracteres.')
+    if(password!==confirm) return onToast('As passwords não coincidem.')
+    setBusy(true)
+    const {error}=await supabase.auth.updateUser({password,data:{needs_password:false}})
+    if(!error) await supabase.auth.refreshSession()
+    setBusy(false)
+    if(error) return onToast(error.message)
+    onToast(inviteSetup?'Conta ativada. Bem-vindo à equipa.':'Password alterada com sucesso.')
+    onDone()
+  }
+  return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><div><div className="eyebrow">SALÃO</div><h1>{inviteSetup?'Definir password':'Nova password'}</h1><p className="muted">{inviteSetup?'Cria a tua password para concluir o convite.':'Escolhe uma nova password para a tua conta.'}</p></div><form className="formStack" onSubmit={submit}><label>Nova password<input name="password" type="password" minLength={6} required autoComplete="new-password" /></label><label>Confirmar password<input name="confirm" type="password" minLength={6} required autoComplete="new-password" /></label><button className="primary full" disabled={busy}>{busy?'A guardar…':'Guardar password'}</button></form></div></div>
 }
 
 function Onboarding({onDone,onToast}:{onDone:()=>void;onToast:(m:string)=>void}){
@@ -220,7 +250,7 @@ function StockView({products,query,setQuery,onScan,onNew,onEdit,onChange}:{produ
 }
 
 function MoreView({membership,salon,manager,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onInvite:()=>void;onLogout:()=>void}){
-  return <div className="stack"><div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>{manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador</strong><small>Gera um código de entrada para a equipa.</small></div><b>›</b></button>}<button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button></div>
+  return <div className="stack"><div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>{manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador</strong><small>Envia um convite diretamente por email.</small></div><b>›</b></button>}<button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button></div>
 }
 
 function ModalLayer({modal,close,membership,members,services,clients,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void}){
@@ -263,16 +293,45 @@ function ProductForm({item,barcode,membership,onSaved}:{item?:Product;barcode?:s
 
 function Scanner({products,onFound}:{products:Product[];onFound:(code:string)=>void}){
   const videoRef=useRef<HTMLVideoElement>(null); const [status,setStatus]=useState('A iniciar câmara…'); const [manual,setManual]=useState('')
-  useEffect(()=>{let stream:MediaStream|null=null;let timer:number|undefined;(async()=>{try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});if(videoRef.current){videoRef.current.srcObject=stream;await videoRef.current.play()}const Detector=(window as any).BarcodeDetector;if(Detector){const detector=new Detector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf']});setStatus('Aponta para o código de barras.');timer=window.setInterval(async()=>{try{const codes=await detector.detect(videoRef.current);if(codes?.[0]?.rawValue){window.clearInterval(timer);onFound(codes[0].rawValue)}}catch{}},350)}else setStatus('Leitura automática não disponível neste browser. Introduz o código abaixo.')}catch{setStatus('Não foi possível abrir a câmara. Confirma a permissão ou introduz o código.')}})();return()=>{if(timer)window.clearInterval(timer);stream?.getTracks().forEach(t=>t.stop())}},[])
+  useEffect(()=>{
+    let stream:MediaStream|null=null; let timer:number|undefined; let controls:{stop:()=>void}|undefined; let stopped=false
+    const finish=(code:string)=>{ if(stopped)return; stopped=true; if(timer)window.clearInterval(timer); controls?.stop(); stream?.getTracks().forEach(t=>t.stop()); onFound(code) }
+    ;(async()=>{
+      try{
+        const Detector=(window as any).BarcodeDetector
+        if(Detector){
+          stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false})
+          if(videoRef.current){videoRef.current.srcObject=stream;await videoRef.current.play()}
+          const detector=new Detector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf']})
+          setStatus('Leitura automática ativa. Aproxima o código da moldura.')
+          timer=window.setInterval(async()=>{try{if(!videoRef.current||stopped)return;const codes=await detector.detect(videoRef.current);if(codes?.[0]?.rawValue)finish(String(codes[0].rawValue))}catch{}},250)
+        }else{
+          setStatus('Leitura automática ativa. Aproxima o código da moldura.')
+          const reader=new BrowserMultiFormatReader(undefined,{delayBetweenScanAttempts:180,delayBetweenScanSuccess:500})
+          controls=await reader.decodeFromVideoDevice(undefined,videoRef.current||undefined,(result)=>{if(result)finish(result.getText())})
+        }
+      }catch(err){
+        console.error(err)
+        setStatus('Não foi possível ler automaticamente. Confirma a permissão da câmara ou introduz o código abaixo.')
+      }
+    })()
+    return()=>{stopped=true;if(timer)window.clearInterval(timer);controls?.stop();stream?.getTracks().forEach(t=>t.stop())}
+  },[])
   void products
-  return <div><div className="scannerWrap"><video ref={videoRef} playsInline muted/><div className="scanFrame"/></div><p className="muted">{status}</p><div className="searchRow"><input value={manual} onChange={e=>setManual(e.target.value)} inputMode="numeric" placeholder="Código de barras"/><button className="primary" onClick={()=>manual.trim()&&onFound(manual.trim())}>Usar</button></div></div>
+  return <div><div className="scannerWrap"><video ref={videoRef} playsInline muted/><div className="scanFrame"/></div><p className="muted">{status}</p><div className="searchRow"><input value={manual} onChange={e=>setManual(e.target.value)} inputMode="numeric" placeholder="Ou escreve o código de barras"/><button className="primary" disabled={!manual.trim()} onClick={()=>manual.trim()&&onFound(manual.trim())}>Usar código</button></div></div>
 }
 
 function InviteForm({onSaved}:{onSaved:(m:string)=>void}){
-  const [code,setCode]=useState('')
-  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const fd=new FormData(e.currentTarget);const {data,error}=await supabase.rpc('create_team_invite',{p_display_name:String(fd.get('name')),p_role:String(fd.get('role'))});if(error)alert(error.message);else setCode(String(data))}
-  if(code)return <div className="inviteResult"><span>Código de convite</span><strong>{code}</strong><p>Envia este código ao colaborador. Depois de criar conta, escolhe “Tenho convite”.</p><button className="primary full" onClick={()=>{navigator.clipboard?.writeText(code);onSaved('Código copiado.')}}>Copiar código</button></div>
-  return <form className="formStack" onSubmit={submit}><label>Nome do colaborador<input name="name" required/></label><label>Permissão<select name="role" defaultValue="employee"><option value="employee">Colaborador — só vê a própria agenda</option><option value="manager">Gerente — vê toda a equipa</option></select></label><button className="primary full">Gerar convite</button></form>
+  const [busy,setBusy]=useState(false)
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault(); setBusy(true); const fd=new FormData(e.currentTarget); const email=String(fd.get('email')||'').trim(); const name=String(fd.get('name')||'').trim(); const role=String(fd.get('role')||'employee')
+    const {data,error}=await supabase.functions.invoke('invite-member',{body:{email,name,role}})
+    setBusy(false)
+    if(error){alert(`Não foi possível enviar o convite: ${error.message}`);return}
+    if(data?.error){alert(`Não foi possível enviar o convite: ${data.error}`);return}
+    onSaved(`Convite enviado para ${email}.`)
+  }
+  return <form className="formStack" onSubmit={submit}><label>Email do colaborador<input name="email" type="email" required placeholder="nome@exemplo.pt" autoComplete="email"/></label><label>Nome do colaborador<input name="name" required placeholder="Ex.: Maria Silva"/></label><label>Permissão<select name="role" defaultValue="employee"><option value="employee">Colaborador — só vê a própria agenda</option><option value="manager">Gerente — vê toda a equipa</option></select></label><button className="primary full" disabled={busy}>{busy?'A enviar…':'Enviar convite por email'}</button><p className="muted small">O colaborador recebe um email, abre o convite e define a própria password.</p></form>
 }
 
 function startClientCreate(setModal:(m:Modal)=>void,showToast:(m:string)=>void){
