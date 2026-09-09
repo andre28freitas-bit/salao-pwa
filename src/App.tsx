@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import type { Session } from '@supabase/supabase-js'
 import { isConfigured, supabase } from './lib/supabase'
 import { BrowserMultiFormatReader } from '@zxing/browser'
+import { createWorker } from 'tesseract.js'
 
 type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
@@ -413,19 +414,111 @@ function ProductForm({item,barcode,membership,onSaved}:{item?:Product;barcode?:s
   </form>
 }
 
+function validGTIN(code:string){
+  if(![8,12,13,14].includes(code.length) || !/^\d+$/.test(code)) return false
+  const digits=code.split('').map(Number)
+  const check=digits.pop()!
+  let sum=0
+  for(let i=digits.length-1,mult=3;i>=0;i--,mult=mult===3?1:3) sum+=digits[i]*mult
+  return ((10-(sum%10))%10)===check
+}
+
+function extractBarcodeFromText(text:string){
+  const cleaned=text
+    .replace(/[Oo]/g,'0')
+    .replace(/[Il|]/g,'1')
+    .replace(/[Ss]/g,'5')
+    .replace(/[Bb]/g,'8')
+  const found:string[]=[]
+  const loose=cleaned.match(/(?:\d[\s.\-]*){8,14}/g)||[]
+  for(const part of loose){
+    const digits=part.replace(/\D/g,'')
+    if([8,12,13,14].includes(digits.length)) found.push(digits)
+  }
+  const compact=cleaned.replace(/\D/g,'')
+  for(const len of [13,12,8,14]){
+    for(let i=0;i<=compact.length-len;i++) found.push(compact.slice(i,i+len))
+  }
+  const unique=[...new Set(found)]
+  return unique.find(validGTIN)||unique.find(x=>[13,12,8,14].includes(x.length))||null
+}
+
+async function canvasFromImageFile(file:File){
+  const url=URL.createObjectURL(file)
+  try{
+    const img=new Image()
+    img.src=url
+    await new Promise<void>((resolve,reject)=>{img.onload=()=>resolve();img.onerror=()=>reject(new Error('Não foi possível abrir a imagem.'))})
+    const canvas=document.createElement('canvas')
+    canvas.width=img.naturalWidth||img.width
+    canvas.height=img.naturalHeight||img.height
+    canvas.getContext('2d')!.drawImage(img,0,0)
+    return canvas
+  }finally{URL.revokeObjectURL(url)}
+}
+
+function captureVideoFrame(video:HTMLVideoElement){
+  if(!video.videoWidth||!video.videoHeight) throw new Error('A câmara ainda não está pronta.')
+  const canvas=document.createElement('canvas')
+  canvas.width=video.videoWidth
+  canvas.height=video.videoHeight
+  canvas.getContext('2d')!.drawImage(video,0,0)
+  return canvas
+}
+
+function cropBarcodeArea(source:HTMLCanvasElement){
+  // A moldura ocupa aproximadamente a zona central mostrada no scanner.
+  const sx=Math.round(source.width*.06)
+  const sy=Math.round(source.height*.22)
+  const sw=Math.round(source.width*.88)
+  const sh=Math.round(source.height*.56)
+  const canvas=document.createElement('canvas')
+  canvas.width=sw
+  canvas.height=sh
+  canvas.getContext('2d')!.drawImage(source,sx,sy,sw,sh,0,0,sw,sh)
+  return canvas
+}
+
+function prepareNumberStrip(source:HTMLCanvasElement){
+  // Os algarismos EAN/UPC ficam normalmente sob as barras. Damos ao OCR uma zona
+  // horizontal curta, ampliada e de alto contraste em vez da fotografia inteira.
+  const sx=0
+  const sy=Math.round(source.height*.45)
+  const sw=source.width
+  const sh=Math.max(1,Math.round(source.height*.55))
+  const scale=Math.max(2,Math.min(4,1600/sw))
+  const canvas=document.createElement('canvas')
+  canvas.width=Math.round(sw*scale)
+  canvas.height=Math.round(sh*scale)
+  const ctx=canvas.getContext('2d')!
+  ctx.imageSmoothingEnabled=true
+  ctx.drawImage(source,sx,sy,sw,sh,0,0,canvas.width,canvas.height)
+  const image=ctx.getImageData(0,0,canvas.width,canvas.height)
+  const data=image.data
+  for(let i=0;i<data.length;i+=4){
+    const grey=.299*data[i]+.587*data[i+1]+.114*data[i+2]
+    const v=grey>155?255:0
+    data[i]=data[i+1]=data[i+2]=v
+  }
+  ctx.putImageData(image,0,0)
+  return canvas
+}
+
 function Scanner({onFound}:{onFound:(code:string)=>void}){
   const videoRef=useRef<HTMLVideoElement>(null)
   const fileRef=useRef<HTMLInputElement>(null)
   const [status,setStatus]=useState('A iniciar a câmara traseira…')
   const [manual,setManual]=useState('')
   const [torch,setTorch]=useState(false)
+  const [processing,setProcessing]=useState(false)
+  const [ocrProgress,setOcrProgress]=useState<number|null>(null)
   const controlsRef=useRef<any>(null)
   const readerRef=useRef<BrowserMultiFormatReader|null>(null)
   const finishedRef=useRef(false)
 
   function finish(raw:string){
     if(finishedRef.current)return
-    const code=String(raw||'').replace(/\s/g,'')
+    const code=String(raw||'').replace(/\D/g,'')
     if(!code)return
     finishedRef.current=true
     try{navigator.vibrate?.(80)}catch{}
@@ -435,24 +528,35 @@ function Scanner({onFound}:{onFound:(code:string)=>void}){
 
   useEffect(()=>{
     let alive=true
+    let hintTimer:number|undefined
     ;(async()=>{
       try{
         if(!navigator.mediaDevices?.getUserMedia) throw new Error('Camera API unavailable')
         const reader=new BrowserMultiFormatReader(undefined,{delayBetweenScanAttempts:80,delayBetweenScanSuccess:800,tryPlayVideoTimeout:7000})
         readerRef.current=reader
-        setStatus('A apontar para o código. Mantém o código inteiro dentro da moldura e aproxima devagar.')
+        setStatus('Mantém o código inteiro dentro da moldura. A leitura automática está ativa.')
         const controls=await reader.decodeFromConstraints(
           {video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false},
           videoRef.current||undefined,
           (result)=>{if(result&&alive)finish(result.getText())}
         )
         controlsRef.current=controls
+        hintTimer=window.setTimeout(()=>{
+          if(alive&&!finishedRef.current)setStatus('Se não ler automaticamente, centra o código e toca em “Ler agora”. Também consigo tentar ler os números por baixo das barras.')
+        },2500)
       }catch(err){
         console.error(err)
-        if(alive)setStatus('Não consegui fazer leitura contínua. Usa “Tirar fotografia” ou introduz o código manualmente.')
+        if(alive)setStatus('Não consegui fazer leitura contínua. Usa “Fotografar código” ou introduz os números manualmente.')
       }
     })()
-    return()=>{alive=false;finishedRef.current=true;controlsRef.current?.stop?.();controlsRef.current=null;readerRef.current=null}
+    return()=>{
+      alive=false
+      if(hintTimer)window.clearTimeout(hintTimer)
+      finishedRef.current=true
+      controlsRef.current?.stop?.()
+      controlsRef.current=null
+      readerRef.current=null
+    }
   },[])
 
   async function toggleTorch(){
@@ -461,29 +565,76 @@ function Scanner({onFound}:{onFound:(code:string)=>void}){
     try{await controls.switchTorch(!torch);setTorch(v=>!v)}catch{alert('Não foi possível ligar a lanterna.')}
   }
 
+  async function tryZXingCanvas(canvas:HTMLCanvasElement){
+    const reader=readerRef.current||new BrowserMultiFormatReader(undefined,{delayBetweenScanAttempts:80})
+    const url=canvas.toDataURL('image/jpeg',.94)
+    try{
+      const result=await reader.decodeFromImageUrl(url)
+      return result.getText().replace(/\D/g,'')||null
+    }catch{return null}
+  }
+
+  async function tryOCR(canvas:HTMLCanvasElement){
+    setStatus('Não consegui ler as barras. A tentar reconhecer os números impressos por baixo…')
+    setOcrProgress(0)
+    const strip=prepareNumberStrip(canvas)
+    const worker=await createWorker('eng',1,{logger:m=>{
+      if(m.status==='recognizing text'&&typeof m.progress==='number') setOcrProgress(Math.round(m.progress*100))
+    }})
+    try{
+      await worker.setParameters({
+        tessedit_char_whitelist:'0123456789',
+        preserve_interword_spaces:'1'
+      })
+      const {data}=await worker.recognize(strip)
+      return extractBarcodeFromText(data.text||'')
+    }finally{
+      await worker.terminate()
+      setOcrProgress(null)
+    }
+  }
+
+  async function processCanvas(source:HTMLCanvasElement){
+    if(processing||finishedRef.current)return
+    setProcessing(true)
+    try{
+      const crop=cropBarcodeArea(source)
+      setStatus('A tentar ler o código de barras…')
+      const direct=await tryZXingCanvas(crop) || await tryZXingCanvas(source)
+      if(direct){finish(direct);return}
+      const fromText=await tryOCR(crop)
+      if(fromText){finish(fromText);return}
+      setStatus('Não consegui identificar o código. Aproxima mais, evita reflexos e garante que os números por baixo das barras ficam visíveis.')
+    }catch(err){
+      console.error(err)
+      setStatus('Não consegui processar esta imagem. Tenta novamente com o código mais perto e bem focado.')
+    }finally{setProcessing(false)}
+  }
+
+  async function captureNow(){
+    try{
+      if(!videoRef.current) return
+      await processCanvas(captureVideoFrame(videoRef.current))
+    }catch(err){console.error(err);setStatus('A câmara ainda não está pronta. Espera um segundo e tenta novamente.')}
+  }
+
   async function scanPhoto(file?:File){
     if(!file)return
     setStatus('A analisar a fotografia…')
-    const url=URL.createObjectURL(file)
-    try{
-      const reader=readerRef.current||new BrowserMultiFormatReader(undefined,{delayBetweenScanAttempts:80})
-      const result=await reader.decodeFromImageUrl(url)
-      finish(result.getText())
-    }catch(err){
-      console.error(err)
-      setStatus('Não consegui ler o código nessa fotografia. Aproxima mais a câmara e tenta novamente.')
-    }finally{URL.revokeObjectURL(url);if(fileRef.current)fileRef.current.value=''}
+    try{await processCanvas(await canvasFromImageFile(file))}
+    finally{if(fileRef.current)fileRef.current.value=''}
   }
 
   return <div>
-    <div className="scannerWrap"><video ref={videoRef} playsInline muted autoPlay/><div className="scanFrame"/></div>
-    <p className="muted">{status}</p>
+    <div className="scannerWrap"><video ref={videoRef} playsInline muted autoPlay/><div className="scanFrame"><span style={{position:'absolute',left:8,right:8,bottom:8,color:'#fff',fontSize:12,textAlign:'center',textShadow:'0 1px 4px #000'}}>Barras + números dentro da moldura</span></div></div>
+    <p className="muted">{status}{ocrProgress!==null?` (${ocrProgress}%)`:''}</p>
+    <button type="button" className="primary full" disabled={processing} onClick={()=>void captureNow()}>{processing?'A analisar…':'🔎 Ler agora'}</button>
     <div className="quickActions">
-      <button type="button" className="secondary" onClick={toggleTorch}>🔦 {torch?'Desligar luz':'Ligar luz'}</button>
-      <button type="button" className="secondary" onClick={()=>fileRef.current?.click()}>📸 Tirar fotografia</button>
+      <button type="button" className="secondary" disabled={processing} onClick={toggleTorch}>🔦 {torch?'Desligar luz':'Ligar luz'}</button>
+      <button type="button" className="secondary" disabled={processing} onClick={()=>fileRef.current?.click()}>📸 Fotografar código</button>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={e=>void scanPhoto(e.target.files?.[0])}/>
     </div>
-    <div className="searchRow"><input value={manual} onChange={e=>setManual(e.target.value.replace(/\s/g,''))} inputMode="numeric" placeholder="Ou escreve o código de barras"/><button type="button" className="primary" disabled={!manual.trim()} onClick={()=>manual.trim()&&finish(manual.trim())}>Usar código</button></div>
+    <div className="searchRow"><input value={manual} onChange={e=>setManual(e.target.value.replace(/\D/g,''))} inputMode="numeric" placeholder="Ou escreve os números do código"/><button type="button" className="primary" disabled={!manual.trim()} onClick={()=>manual.trim()&&finish(manual.trim())}>Usar</button></div>
   </div>
 }
 
