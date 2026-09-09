@@ -254,7 +254,7 @@ function MoreView({membership,salon,manager,onInvite,onLogout}:{membership:Membe
 }
 
 function ModalLayer({modal,close,membership,members,services,clients,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void}){
-  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} membership={membership} members={members} services={services} clients={clients} manager={manager} onSaved={onSaved} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner products={products} onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}</div></div>
+  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} membership={membership} members={members} services={services} clients={clients} manager={manager} onSaved={onSaved} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}</div></div>
 }
 
 function AppointmentForm({item,presetClient,membership,members,services,clients,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;membership:Member;members:Member[];services:Service[];clients:Client[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
@@ -285,40 +285,206 @@ function VisitForm({client,appointment,membership,serviceBy,onSaved}:{client:Cli
   return <form className="formStack" onSubmit={submit}><label>Data<input name="occurred_on" type="date" defaultValue={appointment?localISODate(new Date(appointment.starts_at)):todayISO()} required/></label><label>Serviço<input name="service_label" defaultValue={service?.name||''} placeholder="Ex.: Coloração + corte"/></label><label>Cor / fórmula técnica<textarea name="color_formula" placeholder="Ex.: 6/0 30g + 6/7 20g · Oxidante 6% 50g"/></label><label>Tratamentos / produtos<input name="treatment_products" placeholder="Ex.: Máscara Repair"/></label><label>Observações<textarea name="notes"/></label><label>Valor pago (€)<input name="amount_paid" type="number" step="0.01" defaultValue={service?.price||''}/></label><button className="primary full">Guardar visita</button></form>
 }
 
-function ProductForm({item,barcode,membership,onSaved}:{item?:Product;barcode?:string;membership:Member;onSaved:(m:string)=>void}){
-  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const fd=new FormData(e.currentTarget);const payload={salon_id:membership.salon_id,name:String(fd.get('name')),brand:String(fd.get('brand')||'')||null,barcode:String(fd.get('barcode')||'')||null,unit:String(fd.get('unit')||'un.'),current_stock:item?item.current_stock:Number(fd.get('current_stock')||0),min_stock:Number(fd.get('min_stock')||0),active:true};const q=item?supabase.from('products').update(payload).eq('id',item.id):supabase.from('products').insert(payload);const {error}=await q;if(error)alert(error.message);else onSaved(item?'Produto atualizado.':'Produto criado.')}
-  async function adjust(delta:number){if(!item)return;const {error}=await supabase.rpc('record_stock_movement',{p_product:item.id,p_delta:delta,p_reason:'scanner',p_notes:null});if(error)alert(error.message);else onSaved(`Stock ${delta>0?'aumentado':'reduzido'} em 1.`)}
-  return <form className="formStack" onSubmit={submit}><label>Produto<input name="name" required defaultValue={item?.name||''} placeholder="Ex.: Koleston 6/0"/></label><label>Marca<input name="brand" defaultValue={item?.brand||''}/></label><label>Código de barras<input name="barcode" inputMode="numeric" defaultValue={item?.barcode||barcode||''}/></label><div className="grid2"><label>Stock atual<input name="current_stock" type="number" step="0.1" defaultValue={item?.current_stock||0} readOnly={Boolean(item)}/></label><label>Stock mínimo<input name="min_stock" type="number" step="0.1" defaultValue={item?.min_stock||1}/></label></div>{item&&<div className="quickActions"><button type="button" className="secondary" onClick={()=>adjust(-1)}>−1 stock</button><button type="button" className="secondary" onClick={()=>adjust(1)}>+1 stock</button></div>}<label>Unidade<input name="unit" defaultValue={item?.unit||'un.'}/></label><button className="primary full">Guardar produto</button></form>
+type BarcodeLookupResult = {
+  found:boolean
+  name?:string
+  brand?:string
+  quantity?:string
+  imageUrl?:string
+  source?:string
 }
 
-function Scanner({products,onFound}:{products:Product[];onFound:(code:string)=>void}){
-  const videoRef=useRef<HTMLVideoElement>(null); const [status,setStatus]=useState('A iniciar câmara…'); const [manual,setManual]=useState('')
+async function lookupProductByBarcode(rawCode:string):Promise<BarcodeLookupResult>{
+  const code=rawCode.replace(/\D/g,'')
+  if(!code) return {found:false}
+  const sources=[
+    {label:'Open Beauty Facts',base:'https://world.openbeautyfacts.org'},
+    {label:'Open Products Facts',base:'https://world.openproductsfacts.org'}
+  ]
+  for(const source of sources){
+    try{
+      const fields='code,product_name,product_name_pt,brands,quantity,image_front_url,categories'
+      const r=await fetch(`${source.base}/api/v2/product/${encodeURIComponent(code)}.json?fields=${fields}`,{headers:{Accept:'application/json'}})
+      if(!r.ok) continue
+      const data=await r.json()
+      if(Number(data?.status)!==1 || !data?.product) continue
+      const product=data.product
+      const name=String(product.product_name_pt||product.product_name||'').trim()
+      const brand=String(product.brands||'').split(',')[0].trim()
+      if(!name && !brand) continue
+      return {
+        found:true,
+        name:name||undefined,
+        brand:brand||undefined,
+        quantity:String(product.quantity||'').trim()||undefined,
+        imageUrl:String(product.image_front_url||'').trim()||undefined,
+        source:source.label
+      }
+    }catch(err){
+      console.warn(`Barcode lookup failed at ${source.label}`,err)
+    }
+  }
+  return {found:false}
+}
+
+function ProductForm({item,barcode,membership,onSaved}:{item?:Product;barcode?:string;membership:Member;onSaved:(m:string)=>void}){
+  const [name,setName]=useState(item?.name||'')
+  const [brand,setBrand]=useState(item?.brand||'')
+  const [code,setCode]=useState(item?.barcode||barcode||'')
+  const [scanOpen,setScanOpen]=useState(false)
+  const [lookupBusy,setLookupBusy]=useState(false)
+  const [lookup,setLookup]=useState<BarcodeLookupResult|null>(null)
+
+  async function enrich(nextCode:string,quiet=false){
+    const clean=nextCode.replace(/\D/g,'')
+    setCode(clean)
+    if(!clean) return
+    setLookupBusy(true)
+    const result=await lookupProductByBarcode(clean)
+    setLookupBusy(false)
+    setLookup(result)
+    if(result.found){
+      if(result.name) setName(result.name)
+      if(result.brand) setBrand(result.brand)
+    }else if(!quiet){
+      alert('Código lido, mas não encontrei o produto nas bases públicas. Podes preencher o nome e a marca manualmente e guardar o código para futuras leituras.')
+    }
+  }
+
   useEffect(()=>{
-    let stream:MediaStream|null=null; let timer:number|undefined; let controls:{stop:()=>void}|undefined; let stopped=false
-    const finish=(code:string)=>{ if(stopped)return; stopped=true; if(timer)window.clearInterval(timer); controls?.stop(); stream?.getTracks().forEach(t=>t.stop()); onFound(code) }
+    if(barcode && !item) void enrich(barcode,true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[barcode,item?.id])
+
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    const fd=new FormData(e.currentTarget)
+    const payload={
+      salon_id:membership.salon_id,
+      name:name.trim(),
+      brand:brand.trim()||null,
+      barcode:code.trim()||null,
+      unit:String(fd.get('unit')||'un.'),
+      current_stock:item?item.current_stock:Number(fd.get('current_stock')||0),
+      min_stock:Number(fd.get('min_stock')||0),
+      active:true
+    }
+    if(!payload.name) return alert('Indica o nome do produto.')
+    const q=item?supabase.from('products').update(payload).eq('id',item.id):supabase.from('products').insert(payload)
+    const {error}=await q
+    if(error)alert(error.message);else onSaved(item?'Produto atualizado.':'Produto criado.')
+  }
+
+  async function adjust(delta:number){
+    if(!item)return
+    const {error}=await supabase.rpc('record_stock_movement',{p_product:item.id,p_delta:delta,p_reason:'scanner',p_notes:null})
+    if(error)alert(error.message);else onSaved(`Stock ${delta>0?'aumentado':'reduzido'} em 1.`)
+  }
+
+  if(scanOpen){
+    return <div>
+      <Scanner onFound={async scanned=>{setScanOpen(false);await enrich(scanned)}} />
+      <button type="button" className="secondary full" onClick={()=>setScanOpen(false)}>Cancelar leitura</button>
+    </div>
+  }
+
+  return <form className="formStack" onSubmit={submit}>
+    <label>Produto<input name="name" required value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Koleston 6/0"/></label>
+    <label>Marca<input name="brand" value={brand} onChange={e=>setBrand(e.target.value)}/></label>
+    <label>Código de barras
+      <div className="searchRow">
+        <input name="barcode" inputMode="numeric" value={code} onChange={e=>{setCode(e.target.value.replace(/\D/g,''));setLookup(null)}} placeholder="EAN / UPC"/>
+        <button type="button" className="secondary" onClick={()=>setScanOpen(true)}>📷 Scan</button>
+      </div>
+    </label>
+    {code&&<div className="quickActions">
+      <button type="button" className="secondary" disabled={lookupBusy} onClick={()=>void enrich(code)}>{lookupBusy?'A pesquisar…':'🔎 Procurar produto'}</button>
+    </div>}
+    {lookup?.found&&<div className="infoCard">
+      <b>Produto encontrado · {lookup.source}</b>
+      <span>{lookup.name||name}{lookup.brand?` · ${lookup.brand}`:''}{lookup.quantity?` · ${lookup.quantity}`:''}</span>
+      {lookup.imageUrl&&<img src={lookup.imageUrl} alt="Produto encontrado" style={{width:72,height:72,objectFit:'contain',borderRadius:12,marginTop:8,background:'#fff'}}/>}
+    </div>}
+    {lookup && !lookup.found && <p className="muted">Não encontrado nas bases públicas. O código fica guardado na mesma.</p>}
+    <div className="grid2"><label>Stock atual<input name="current_stock" type="number" step="0.1" defaultValue={item?.current_stock||0} readOnly={Boolean(item)}/></label><label>Stock mínimo<input name="min_stock" type="number" step="0.1" defaultValue={item?.min_stock||1}/></label></div>
+    {item&&<div className="quickActions"><button type="button" className="secondary" onClick={()=>adjust(-1)}>−1 stock</button><button type="button" className="secondary" onClick={()=>adjust(1)}>+1 stock</button></div>}
+    <label>Unidade<input name="unit" defaultValue={item?.unit||'un.'}/></label>
+    <button className="primary full">Guardar produto</button>
+  </form>
+}
+
+function Scanner({onFound}:{onFound:(code:string)=>void}){
+  const videoRef=useRef<HTMLVideoElement>(null)
+  const fileRef=useRef<HTMLInputElement>(null)
+  const [status,setStatus]=useState('A iniciar a câmara traseira…')
+  const [manual,setManual]=useState('')
+  const [torch,setTorch]=useState(false)
+  const controlsRef=useRef<any>(null)
+  const readerRef=useRef<BrowserMultiFormatReader|null>(null)
+  const finishedRef=useRef(false)
+
+  function finish(raw:string){
+    if(finishedRef.current)return
+    const code=String(raw||'').replace(/\s/g,'')
+    if(!code)return
+    finishedRef.current=true
+    try{navigator.vibrate?.(80)}catch{}
+    controlsRef.current?.stop?.()
+    onFound(code)
+  }
+
+  useEffect(()=>{
+    let alive=true
     ;(async()=>{
       try{
-        const Detector=(window as any).BarcodeDetector
-        if(Detector){
-          stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false})
-          if(videoRef.current){videoRef.current.srcObject=stream;await videoRef.current.play()}
-          const detector=new Detector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf']})
-          setStatus('Leitura automática ativa. Aproxima o código da moldura.')
-          timer=window.setInterval(async()=>{try{if(!videoRef.current||stopped)return;const codes=await detector.detect(videoRef.current);if(codes?.[0]?.rawValue)finish(String(codes[0].rawValue))}catch{}},250)
-        }else{
-          setStatus('Leitura automática ativa. Aproxima o código da moldura.')
-          const reader=new BrowserMultiFormatReader(undefined,{delayBetweenScanAttempts:180,delayBetweenScanSuccess:500})
-          controls=await reader.decodeFromVideoDevice(undefined,videoRef.current||undefined,(result)=>{if(result)finish(result.getText())})
-        }
+        if(!navigator.mediaDevices?.getUserMedia) throw new Error('Camera API unavailable')
+        const reader=new BrowserMultiFormatReader(undefined,{delayBetweenScanAttempts:80,delayBetweenScanSuccess:800,tryPlayVideoTimeout:7000})
+        readerRef.current=reader
+        setStatus('A apontar para o código. Mantém o código inteiro dentro da moldura e aproxima devagar.')
+        const controls=await reader.decodeFromConstraints(
+          {video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false},
+          videoRef.current||undefined,
+          (result)=>{if(result&&alive)finish(result.getText())}
+        )
+        controlsRef.current=controls
       }catch(err){
         console.error(err)
-        setStatus('Não foi possível ler automaticamente. Confirma a permissão da câmara ou introduz o código abaixo.')
+        if(alive)setStatus('Não consegui fazer leitura contínua. Usa “Tirar fotografia” ou introduz o código manualmente.')
       }
     })()
-    return()=>{stopped=true;if(timer)window.clearInterval(timer);controls?.stop();stream?.getTracks().forEach(t=>t.stop())}
+    return()=>{alive=false;finishedRef.current=true;controlsRef.current?.stop?.();controlsRef.current=null;readerRef.current=null}
   },[])
-  void products
-  return <div><div className="scannerWrap"><video ref={videoRef} playsInline muted/><div className="scanFrame"/></div><p className="muted">{status}</p><div className="searchRow"><input value={manual} onChange={e=>setManual(e.target.value)} inputMode="numeric" placeholder="Ou escreve o código de barras"/><button className="primary" disabled={!manual.trim()} onClick={()=>manual.trim()&&onFound(manual.trim())}>Usar código</button></div></div>
+
+  async function toggleTorch(){
+    const controls=controlsRef.current
+    if(!controls?.switchTorch) return alert('A lanterna não está disponível neste telemóvel/browser.')
+    try{await controls.switchTorch(!torch);setTorch(v=>!v)}catch{alert('Não foi possível ligar a lanterna.')}
+  }
+
+  async function scanPhoto(file?:File){
+    if(!file)return
+    setStatus('A analisar a fotografia…')
+    const url=URL.createObjectURL(file)
+    try{
+      const reader=readerRef.current||new BrowserMultiFormatReader(undefined,{delayBetweenScanAttempts:80})
+      const result=await reader.decodeFromImageUrl(url)
+      finish(result.getText())
+    }catch(err){
+      console.error(err)
+      setStatus('Não consegui ler o código nessa fotografia. Aproxima mais a câmara e tenta novamente.')
+    }finally{URL.revokeObjectURL(url);if(fileRef.current)fileRef.current.value=''}
+  }
+
+  return <div>
+    <div className="scannerWrap"><video ref={videoRef} playsInline muted autoPlay/><div className="scanFrame"/></div>
+    <p className="muted">{status}</p>
+    <div className="quickActions">
+      <button type="button" className="secondary" onClick={toggleTorch}>🔦 {torch?'Desligar luz':'Ligar luz'}</button>
+      <button type="button" className="secondary" onClick={()=>fileRef.current?.click()}>📸 Tirar fotografia</button>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={e=>void scanPhoto(e.target.files?.[0])}/>
+    </div>
+    <div className="searchRow"><input value={manual} onChange={e=>setManual(e.target.value.replace(/\s/g,''))} inputMode="numeric" placeholder="Ou escreve o código de barras"/><button type="button" className="primary" disabled={!manual.trim()} onClick={()=>manual.trim()&&finish(manual.trim())}>Usar código</button></div>
+  </div>
 }
 
 function InviteForm({onSaved}:{onSaved:(m:string)=>void}){
