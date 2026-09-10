@@ -22,6 +22,7 @@ type Modal =
   | { kind:'product'; item?:Product; barcode?:string }
   | { kind:'scanner' }
   | { kind:'invite' }
+  | { kind:'staff' }
   | null
 
 const locale = 'pt-PT'
@@ -170,7 +171,7 @@ export default function App(){
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
-      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
+      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
     </main>
 
     <nav className="bottomNav">
@@ -251,12 +252,12 @@ function StockView({products,query,setQuery,onScan,onNew,onEdit,onChange}:{produ
   return <><div className="stockActions"><button className="primary" onClick={onScan}>▣ Scan código</button><button className="secondary" onClick={onNew}>+ Produto</button></div><div className="searchRow"><input type="search" placeholder="Produto, marca ou código…" value={query} onChange={e=>setQuery(e.target.value)} /></div><div className="stack">{arr.map(p=><ProductCard key={p.id} p={p} actions={<><button className="mini" onClick={()=>onChange(p,-1)}>−1</button><button className="mini" onClick={()=>onChange(p,1)}>+1</button><button className="mini" onClick={()=>onEdit(p)}>Editar</button></>} />)}</div></>
 }
 
-function MoreView({membership,salon,manager,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onInvite:()=>void;onLogout:()=>void}){
-  return <div className="stack"><div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>{manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador</strong><small>Envia um convite diretamente por email.</small></div><b>›</b></button>}<button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button></div>
+function MoreView({membership,salon,manager,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
+  return <div className="stack"><div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>{manager&&<button className="menuCard" onClick={onAddStaff}><span>✂️</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}{manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador com acesso</strong><small>Envia um convite por email para usar a aplicação.</small></div><b>›</b></button>}<button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button></div>
 }
 
 function ModalLayer({modal,close,membership,members,services,clients,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void}){
-  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} membership={membership} members={members} services={services} clients={clients} manager={manager} onSaved={onSaved} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}</div></div>
+  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} membership={membership} members={members} services={services} clients={clients} manager={manager} onSaved={onSaved} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}</div></div>
 }
 
 function AppointmentForm({item,presetClient,membership,members,services,clients,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;membership:Member;members:Member[];services:Service[];clients:Client[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
@@ -696,6 +697,21 @@ function Scanner({onFound}:{onFound:(code:string)=>void}){
   </div>
 }
 
+function StaffForm({onSaved}:{onSaved:(m:string)=>void}){
+  const [busy,setBusy]=useState(false)
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    setBusy(true)
+    const fd=new FormData(e.currentTarget)
+    const name=String(fd.get('name')||'').trim()
+    const {error}=await supabase.rpc('create_staff_without_login',{p_display_name:name})
+    setBusy(false)
+    if(error){alert(`Não foi possível adicionar o profissional: ${error.message}`);return}
+    onSaved(`${name} foi adicionado à equipa e já pode receber marcações.`)
+  }
+  return <form className="formStack" onSubmit={submit}><label>Nome do profissional<input name="name" required autoFocus placeholder="Ex.: Carla" /></label><button className="primary full" disabled={busy}>{busy?'A adicionar…':'Adicionar profissional'}</button><p className="muted small">Não é criado qualquer login. Este profissional aparece na agenda e pode ser associado às clientes e às marcações.</p></form>
+}
+
 function InviteForm({onSaved}:{onSaved:(m:string)=>void}){
   const [busy,setBusy]=useState(false)
   async function submit(e:FormEvent<HTMLFormElement>){
@@ -726,7 +742,7 @@ function Section({title,children}:{title:string;children:ReactNode}){return <sec
 function Empty({children}:{children:ReactNode}){return <div className="empty">{children}</div>}
 function InfoCard({label,children}:{label:string;children:ReactNode}){return <div className="infoCard"><span>{label}</span><strong>{children}</strong></div>}
 
-function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':'Convidar colaborador'}
+function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':'Convidar colaborador'}
 function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Conta'} as const)[v]}
 function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Mais'} as const)[v]}
 function navIcon(v:View){return ({today:'⌂',agenda:'□',clients:'♙',alerts:'!',stock:'▤',more:'•••'} as const)[v]}
