@@ -291,14 +291,14 @@ function AppointmentForm({item,presetClient,membership,members,services,clients,
     if(error)alert(error.message);else onSaved(item?'Marcação atualizada.':'Marcação criada.')
   }
 
-  return <form className="formStack" onSubmit={submit}>
+  return <form className="formStack appointmentForm" onSubmit={submit}>
     <label>Cliente<select name="client_id" value={clientId} onChange={e=>changeClient(e.target.value)}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-    <div className="grid2"><label>Data<input type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label><label>Hora<input type="time" value={time} onChange={e=>setTime(e.target.value)} required/></label></div>
     <label>Serviço<select value={serviceId} onChange={e=>setServiceId(e.target.value)}>{services.map(s=><option key={s.id} value={s.id}>{s.name} · {s.duration_minutes} min</option>)}</select></label>
     {manager&&<label>Profissional<select name="employee_id" value={employeeId} onChange={e=>setEmployeeId(e.target.value)}>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select></label>}
-    <label>Estado<select name="status" defaultValue={item?.status||'pending'}><option value="pending">Pendente</option><option value="confirmed">Confirmada</option><option value="completed">Concluída</option><option value="no_show">Faltou</option></select></label>
-    <label>Observações<textarea name="notes" defaultValue={item?.notes||''}/></label>
-    <button className="primary full" disabled={busy}>{busy?'A guardar…':'Guardar marcação'}</button>
+    <div className="grid2 appointmentDateTime"><label>Data<input type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label><label>Hora<input type="time" value={time} onChange={e=>setTime(e.target.value)} required/></label></div>
+    {item&&<label>Estado<select name="status" defaultValue={item.status}><option value="pending">Pendente</option><option value="confirmed">Confirmada</option><option value="completed">Concluída</option><option value="no_show">Faltou</option></select></label>}
+    <label>Observações <span className="optionalLabel">opcional</span><textarea name="notes" defaultValue={item?.notes||''} placeholder="Ex.: preferência, atraso, detalhe importante…"/></label>
+    <button className="primary full appointmentSave" disabled={busy}>{busy?'A guardar…':item?'Guardar alterações':'Guardar marcação'}</button>
     {item&&<div className="modalBottomActions"><button type="button" className="secondary" onClick={()=>onVisit(item)}>Concluir + histórico</button><button type="button" className="dangerButton" onClick={()=>onDelete(item)}>Cancelar marcação</button></div>}
   </form>
 }
