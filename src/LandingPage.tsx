@@ -16,8 +16,6 @@ type PublicSiteSettings = {
 type PublicService = {
   id:string
   name:string
-  duration_minutes:number
-  price:number
   image_url:string|null
 }
 
@@ -71,7 +69,7 @@ export default function LandingPage({ onLogin }: LandingPageProps){
         .eq('salon_id',SALON_ID)
         .maybeSingle(),
       supabase.from('services')
-        .select('id,name,duration_minutes,price,image_url')
+        .select('id,name,image_url')
         .eq('salon_id',SALON_ID)
         .eq('active',true)
         .order('name')
