@@ -500,3 +500,12 @@
     height:50px;
   }
 }
+
+@media(max-width:620px){
+  .periodChoice{
+    grid-template-columns:1fr;
+  }
+  .periodChoice label:last-child span{
+    white-space:nowrap;
+  }
+}
