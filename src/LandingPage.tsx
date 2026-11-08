@@ -10,6 +10,15 @@ type PublicSiteSettings = {
   instagram_url:string|null
   address:string|null
   public_phone:string|null
+  logo_url:string|null
+}
+
+type PublicService = {
+  id:string
+  name:string
+  duration_minutes:number
+  price:number
+  image_url:string|null
 }
 
 
@@ -17,7 +26,7 @@ const SALON_ID = 'c390b52f-ede9-44bc-a657-348df30110a0'
 const salonImage = 'https://images.unsplash.com/photo-1706629506571-a6d86798916b?auto=format&fit=crop&w=1800&q=80'
 const spaceImage = 'https://images.unsplash.com/photo-1706629505300-168aa1604912?auto=format&fit=crop&w=1400&q=78'
 
-const services = [
+const fallbackServices = [
   {
     name: 'Coloração',
     text: 'Cor, brilho e dimensão com um resultado pensado para si.',
@@ -51,17 +60,42 @@ export default function LandingPage({ onLogin }: LandingPageProps){
   const [selectedService,setSelectedService]=useState('')
   const [bookingBusy,setBookingBusy]=useState(false)
   const [bookingSuccess,setBookingSuccess]=useState(false)
-  const [siteSettings,setSiteSettings]=useState<PublicSiteSettings>({whatsapp_phone:null,instagram_url:null,address:null,public_phone:null})
+  const [siteSettings,setSiteSettings]=useState<PublicSiteSettings>({whatsapp_phone:null,instagram_url:null,address:null,public_phone:null,logo_url:null})
+  const [publicServices,setPublicServices]=useState<PublicService[]>([])
 
   useEffect(()=>{
     let alive=true
-    supabase.from('salon_public_settings')
-      .select('whatsapp_phone,instagram_url,address,public_phone')
-      .eq('salon_id',SALON_ID)
-      .maybeSingle()
-      .then(({data})=>{if(alive&&data)setSiteSettings(data as PublicSiteSettings)})
+    Promise.all([
+      supabase.from('salon_public_settings')
+        .select('whatsapp_phone,instagram_url,address,public_phone,logo_url')
+        .eq('salon_id',SALON_ID)
+        .maybeSingle(),
+      supabase.from('services')
+        .select('id,name,duration_minutes,price,image_url')
+        .eq('salon_id',SALON_ID)
+        .eq('active',true)
+        .order('name')
+    ]).then(([settingsResult,servicesResult])=>{
+      if(!alive) return
+      if(settingsResult.data) setSiteSettings(settingsResult.data as PublicSiteSettings)
+      if(servicesResult.data) setPublicServices(servicesResult.data as PublicService[])
+    })
     return ()=>{alive=false}
   },[])
+
+  const displayServices = publicServices.length
+    ? publicServices.map(service=>{
+        const fallback=fallbackServices.find(x=>x.name.toLowerCase()===service.name.toLowerCase())
+        return {
+          id:service.id,
+          name:service.name,
+          text:fallback?.text||'Serviço personalizado e adaptado às necessidades do seu cabelo.',
+          image:service.image_url||fallback?.image||salonImage
+        }
+      })
+    : fallbackServices.map((service,index)=>({...service,id:`fallback-${index}`}))
+
+  const resultServices=(displayServices.length>=3?displayServices:fallbackServices.map((service,index)=>({...service,id:`fallback-result-${index}`}))).slice(0,3)
 
   function scrollTo(id:string){
     setMenuOpen(false)
@@ -107,8 +141,10 @@ export default function LandingPage({ onLogin }: LandingPageProps){
   return <div className="salonSite">
     <header className="siteHeader">
       <button className="brandLockup" onClick={()=>scrollTo('inicio')} aria-label="Ir para o início">
-        <span className="brandMonogram">DC</span>
-        <span className="brandWords"><strong>Débora Cruz</strong><small>CABELEIREIROS</small></span>
+        {siteSettings.logo_url?
+          <img className="brandUploadedLogo" src={siteSettings.logo_url} alt="Débora Cruz Cabeleireiros"/>:
+          <><span className="brandMonogram">DC</span><span className="brandWords"><strong>Débora Cruz</strong><small>CABELEIREIROS</small></span></>
+        }
       </button>
 
       <nav className={menuOpen?'siteNav open':'siteNav'}>
@@ -158,7 +194,7 @@ export default function LandingPage({ onLogin }: LandingPageProps){
         </div>
 
         <div className="serviceGrid">
-          {services.map(service=><article className="serviceCard" key={service.name}>
+          {displayServices.map(service=><article className="serviceCard" key={service.id}>
             <div className="serviceImage"><img src={service.image} alt={service.name} loading="lazy"/></div>
             <div className="serviceBody">
               <h3>{service.name}</h3>
@@ -197,9 +233,7 @@ export default function LandingPage({ onLogin }: LandingPageProps){
           <h2>Cabelo cuidado, sem complicar.</h2>
         </div>
         <div className="resultsGrid">
-          <div><img src={services[0].image} alt="Trabalho de cabelo" loading="lazy"/></div>
-          <div><img src={services[3].image} alt="Penteado" loading="lazy"/></div>
-          <div><img src={services[2].image} alt="Cuidado de cabelo" loading="lazy"/></div>
+          {resultServices.map(service=><div key={service.id}><img src={service.image} alt={service.name} loading="lazy"/></div>)}
         </div>
       </section>
 
@@ -218,8 +252,10 @@ export default function LandingPage({ onLogin }: LandingPageProps){
 
     <footer className="siteFooter" id="contactos">
       <div className="footerBrand">
-        <span className="brandMonogram">DC</span>
-        <div><strong>Débora Cruz</strong><small>Cabeleireiros</small></div>
+        {siteSettings.logo_url?
+          <img className="footerUploadedLogo" src={siteSettings.logo_url} alt="Débora Cruz Cabeleireiros"/>:
+          <><span className="brandMonogram">DC</span><div><strong>Débora Cruz</strong><small>Cabeleireiros</small></div></>
+        }
       </div>
       <div className="footerCopy">
         <strong>Contactos</strong>
@@ -273,7 +309,7 @@ export default function LandingPage({ onLogin }: LandingPageProps){
           <label>Serviço
             <select name="service_name" required value={selectedService} onChange={e=>setSelectedService(e.target.value)}>
               <option value="">Escolha um serviço</option>
-              {services.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
+              {displayServices.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}
               <option value="Outro">Outro</option>
             </select>
           </label>
