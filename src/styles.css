@@ -331,3 +331,21 @@
 .bookingRequestTitle{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .bookingRequestTitle .tag{font-size:10px}
 .primaryMini{background:var(--ink)!important;color:white!important;border-color:var(--ink)!important}
+
+/* Website & public contact settings */
+.siteSettingsForm .formSection{margin-bottom:6px}
+.siteSettingsForm textarea{min-height:92px;resize:vertical}
+.fieldHint{
+  display:block;
+  margin-top:5px;
+  font-size:10px;
+  line-height:1.4;
+  color:var(--muted);
+  font-weight:500;
+}
+.centerInline{
+  padding:28px 12px;
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+}
