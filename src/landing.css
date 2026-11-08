@@ -339,3 +339,16 @@
     display:block;
   }
 }
+
+@media(max-width:620px){
+  .bookingCalendarIcon{
+    width:20px;
+    height:20px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    flex:0 0 auto;
+  }
+}
