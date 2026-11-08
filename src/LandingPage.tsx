@@ -1,9 +1,17 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 
 type LandingPageProps = {
   onLogin: () => void
 }
+
+type PublicSiteSettings = {
+  whatsapp_phone:string|null
+  instagram_url:string|null
+  address:string|null
+  public_phone:string|null
+}
+
 
 const SALON_ID = 'c390b52f-ede9-44bc-a657-348df30110a0'
 const salonImage = 'https://images.unsplash.com/photo-1706629506571-a6d86798916b?auto=format&fit=crop&w=1800&q=80'
@@ -43,6 +51,17 @@ export default function LandingPage({ onLogin }: LandingPageProps){
   const [selectedService,setSelectedService]=useState('')
   const [bookingBusy,setBookingBusy]=useState(false)
   const [bookingSuccess,setBookingSuccess]=useState(false)
+  const [siteSettings,setSiteSettings]=useState<PublicSiteSettings>({whatsapp_phone:null,instagram_url:null,address:null,public_phone:null})
+
+  useEffect(()=>{
+    let alive=true
+    supabase.from('salon_public_settings')
+      .select('whatsapp_phone,instagram_url,address,public_phone')
+      .eq('salon_id',SALON_ID)
+      .maybeSingle()
+      .then(({data})=>{if(alive&&data)setSiteSettings(data as PublicSiteSettings)})
+    return ()=>{alive=false}
+  },[])
 
   function scrollTo(id:string){
     setMenuOpen(false)
@@ -56,9 +75,11 @@ export default function LandingPage({ onLogin }: LandingPageProps){
   }
 
   function openWhatsApp(){
-    // Número final do salão ainda não está configurado no projeto.
-    // Até lá, não encaminhamos clientes para um contacto incorreto.
-    book()
+    const raw=(siteSettings.whatsapp_phone||'').replace(/\D/g,'')
+    if(!raw) return book()
+    const phone=raw.startsWith('00')?raw.slice(2):raw.length===9?'351'+raw:raw
+    const message='Olá! Gostava de pedir informações / fazer uma marcação.'
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`,'_blank','noopener,noreferrer')
   }
 
   async function submitBooking(e:FormEvent<HTMLFormElement>){
@@ -185,7 +206,7 @@ export default function LandingPage({ onLogin }: LandingPageProps){
         </div>
         <div className="bookingActions">
           <button className="sitePrimary" onClick={()=>book()}>Pedir marcação</button>
-          <a className="instagramLink" href="https://www.instagram.com/deboracruzcabeleireiros/" target="_blank" rel="noreferrer">Instagram ↗</a>
+          {siteSettings.instagram_url&&<a className="instagramLink" href={siteSettings.instagram_url} target="_blank" rel="noreferrer">Instagram ↗</a>}
         </div>
       </section>
     </main>
@@ -197,21 +218,23 @@ export default function LandingPage({ onLogin }: LandingPageProps){
       </div>
       <div className="footerCopy">
         <strong>Contactos</strong>
-        <p>Os contactos finais, horário e localização podem ser ligados aqui sem alterar o restante layout.</p>
+        {siteSettings.public_phone&&<a className="footerContactLink" href={`tel:${siteSettings.public_phone.replace(/\s/g,'')}`}>{siteSettings.public_phone}</a>}
+        {siteSettings.address&&<p className="footerAddress">{siteSettings.address}</p>}
+        {!siteSettings.public_phone&&!siteSettings.address&&<p>Contacte-nos através do formulário de marcação.</p>}
       </div>
-      <div className="footerSocial">
+      {siteSettings.instagram_url&&<div className="footerSocial">
         <strong>Siga-nos</strong>
-        <a href="https://www.instagram.com/deboracruzcabeleireiros/" target="_blank" rel="noreferrer">@deboracruzcabeleireiros</a>
-      </div>
+        <a href={siteSettings.instagram_url} target="_blank" rel="noreferrer">Instagram ↗</a>
+      </div>}
       <button className="footerLogin" onClick={onLogin}>Área reservada</button>
     </footer>
 
     {!bookingOpen&&<>
-      <button className="mobileWhatsApp" onClick={openWhatsApp} aria-label="Falar no WhatsApp" title="WhatsApp">
+      {siteSettings.whatsapp_phone&&<button className="mobileWhatsApp" onClick={openWhatsApp} aria-label="Falar no WhatsApp" title="WhatsApp">
         <svg viewBox="0 0 32 32" aria-hidden="true">
           <path d="M16.04 4.5A11.34 11.34 0 0 0 6.3 21.65L4.5 27.5l6-1.72A11.35 11.35 0 1 0 16.04 4.5Zm0 20.55a9.18 9.18 0 0 1-4.68-1.28l-.34-.2-3.56 1.02 1.06-3.46-.22-.35a9.18 9.18 0 1 1 7.74 4.27Zm5.04-6.86c-.28-.14-1.64-.81-1.89-.9-.25-.09-.44-.14-.62.14-.18.28-.71.9-.87 1.09-.16.18-.32.21-.6.07-.27-.14-1.16-.43-2.21-1.37-.82-.73-1.37-1.63-1.53-1.91-.16-.28-.02-.43.12-.56.13-.12.28-.32.41-.48.14-.16.18-.28.28-.46.09-.18.05-.35-.02-.49-.07-.14-.62-1.5-.85-2.05-.22-.54-.45-.47-.62-.48h-.53c-.18 0-.48.07-.73.35-.25.28-.96.94-.96 2.29s.98 2.65 1.12 2.84c.14.18 1.93 2.94 4.67 4.12.65.28 1.16.45 1.56.58.66.21 1.25.18 1.72.11.53-.08 1.64-.67 1.87-1.32.23-.65.23-1.21.16-1.32-.07-.12-.25-.19-.53-.33Z"/>
         </svg>
-      </button>
+      </button>}
       <div className="mobileStickyBooking">
         <button onClick={()=>book()}>
           <svg className="bookingCalendarIcon" viewBox="0 0 24 24" aria-hidden="true">
