@@ -55,6 +55,12 @@ export default function LandingPage({ onLogin }: LandingPageProps){
     setBookingOpen(true)
   }
 
+  function openWhatsApp(){
+    // Número final do salão ainda não está configurado no projeto.
+    // Até lá, não encaminhamos clientes para um contacto incorreto.
+    book()
+  }
+
   async function submitBooking(e:FormEvent<HTMLFormElement>){
     e.preventDefault()
     setBookingBusy(true)
@@ -199,6 +205,17 @@ export default function LandingPage({ onLogin }: LandingPageProps){
       </div>
       <button className="footerLogin" onClick={onLogin}>Área reservada</button>
     </footer>
+
+    {!bookingOpen&&<>
+      <button className="mobileWhatsApp" onClick={openWhatsApp} aria-label="Falar no WhatsApp" title="WhatsApp">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16.04 4.5A11.34 11.34 0 0 0 6.3 21.65L4.5 27.5l6-1.72A11.35 11.35 0 1 0 16.04 4.5Zm0 20.55a9.18 9.18 0 0 1-4.68-1.28l-.34-.2-3.56 1.02 1.06-3.46-.22-.35a9.18 9.18 0 1 1 7.74 4.27Zm5.04-6.86c-.28-.14-1.64-.81-1.89-.9-.25-.09-.44-.14-.62.14-.18.28-.71.9-.87 1.09-.16.18-.32.21-.6.07-.27-.14-1.16-.43-2.21-1.37-.82-.73-1.37-1.63-1.53-1.91-.16-.28-.02-.43.12-.56.13-.12.28-.32.41-.48.14-.16.18-.28.28-.46.09-.18.05-.35-.02-.49-.07-.14-.62-1.5-.85-2.05-.22-.54-.45-.47-.62-.48h-.53c-.18 0-.48.07-.73.35-.25.28-.96.94-.96 2.29s.98 2.65 1.12 2.84c.14.18 1.93 2.94 4.67 4.12.65.28 1.16.45 1.56.58.66.21 1.25.18 1.72.11.53-.08 1.64-.67 1.87-1.32.23-.65.23-1.21.16-1.32-.07-.12-.25-.19-.53-.33Z"/>
+        </svg>
+      </button>
+      <div className="mobileStickyBooking">
+        <button onClick={()=>book()}><span aria-hidden="true">▣</span> Agendar serviço</button>
+      </div>
+    </>}
 
     {bookingOpen&&<div className="bookingModalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setBookingOpen(false)}}>
       <div className="bookingModal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
