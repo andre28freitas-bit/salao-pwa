@@ -33,6 +33,9 @@ const todayISO = () => localISODate(new Date())
 function localISODate(d:Date){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 function dateLabel(iso:string){ return new Intl.DateTimeFormat(locale,{weekday:'long',day:'2-digit',month:'short'}).format(new Date(`${iso}T12:00:00`)) }
 function addDays(iso:string,n:number){ const d=new Date(`${iso}T12:00:00`); d.setDate(d.getDate()+n); return localISODate(d) }
+function startOfWeekISO(iso:string){ const d=new Date(`${iso}T12:00:00`); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return localISODate(d) }
+function addMonthsISO(iso:string,n:number){ const d=new Date(`${iso}T12:00:00`); d.setDate(1); d.setMonth(d.getMonth()+n); return localISODate(d) }
+function monthLabel(iso:string){ return new Intl.DateTimeFormat(locale,{month:'long',year:'numeric'}).format(new Date(`${iso}T12:00:00`)) }
 function hhmm(iso:string){ return new Intl.DateTimeFormat(locale,{hour:'2-digit',minute:'2-digit'}).format(new Date(iso)) }
 function firstName(name:string){ return name.trim().split(/\s+/)[0] || name }
 function weeksBetween(date:string){ return Math.floor((Date.now()-new Date(`${date}T12:00:00`).getTime())/(7*864e5)) }
@@ -192,7 +195,7 @@ export default function App(){
 
     <main className="content">
       {view==='today' && <TodayView appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
-      {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
+      {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
@@ -270,8 +273,95 @@ function TodayView({appointments,tomorrowAppointments,upcomingBirthdays,retentio
   <Section title="Clientes a recuperar">{retention.length?retention.slice(0,4).map((r:any)=><RetentionCard key={r.client.id} r={r} onBook={()=>onBook(r.client)}/>):<Empty>Nenhuma cliente em atraso.</Empty>}</Section></>
 }
 
-function AgendaView({date,setDate,items,manager,mode,setMode,membership,clientBy,serviceBy,memberBy,onNew,onOpen,onICS}:{date:string;setDate:(s:string)=>void;items:Appointment[];manager:boolean;mode:'mine'|'team';setMode:(m:'mine'|'team')=>void;membership:Member;clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;onNew:()=>void;onOpen:(a:Appointment)=>void;onICS:(a:Appointment)=>void}){
-  return <><div className="agendaToolbar"><button className="iconButton" onClick={()=>setDate(addDays(date,-1))}>‹</button><input className="dateInput" type="date" value={date} onChange={e=>setDate(e.target.value)} /><button className="iconButton" onClick={()=>setDate(addDays(date,1))}>›</button><button className="primary small" onClick={onNew}>+ Marcar</button></div>{manager&&<div className="segmented"><button className={mode==='mine'?'active':''} onClick={()=>setMode('mine')}>Minha agenda</button><button className={mode==='team'?'active':''} onClick={()=>setMode('team')}>Equipa</button></div>}<div className="dayTitle">{dateLabel(date)}{!manager&&<span className="tag">{membership.display_name}</span>}</div><div className="timeline">{items.length?items.map(a=>{const c=clientBy(a.client_id),s=serviceBy(a.service_id),m=memberBy(a.employee_id);return <div className="timeRow" key={a.id}><div className="time">{hhmm(a.starts_at)}</div><article className="bookingCard"><button className="bookingMain" onClick={()=>onOpen(a)}><strong>{c?.name||'Cliente'}</strong><span>{s?.name||'Serviço'} · {m?.display_name}</span>{a.notes&&<small>{a.notes}</small>}</button><button className="calendarBtn" onClick={()=>onICS(a)} title="Adicionar ao calendário">▣</button></article></div>}):<Empty>Sem marcações neste dia.</Empty>}</div></>
+function AgendaView({date,setDate,items,appointments,manager,mode,setMode,membership,clientBy,serviceBy,memberBy,onNew,onOpen,onICS}:{date:string;setDate:(s:string)=>void;items:Appointment[];appointments:Appointment[];manager:boolean;mode:'mine'|'team';setMode:(m:'mine'|'team')=>void;membership:Member;clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;onNew:()=>void;onOpen:(a:Appointment)=>void;onICS:(a:Appointment)=>void}){
+  const [viewMode,setViewMode]=useState<'day'|'week'|'month'>('day')
+  const personFiltered=useMemo(()=>appointments.filter(a=>{
+    if(a.status==='cancelled') return false
+    if(!manager || mode==='mine') return a.employee_id===membership.id
+    return true
+  }),[appointments,manager,mode,membership.id])
+
+  const weekStart=startOfWeekISO(date)
+  const weekDays=Array.from({length:7},(_,i)=>addDays(weekStart,i))
+  const monthDate=new Date(`${date}T12:00:00`)
+  const monthStart=new Date(monthDate.getFullYear(),monthDate.getMonth(),1,12)
+  const monthStartIso=localISODate(monthStart)
+  const monthGridStart=startOfWeekISO(monthStartIso)
+  const monthDays=Array.from({length:42},(_,i)=>addDays(monthGridStart,i))
+
+  function changePeriod(direction:number){
+    if(viewMode==='day') setDate(addDays(date,direction))
+    else if(viewMode==='week') setDate(addDays(date,direction*7))
+    else setDate(addMonthsISO(date,direction))
+  }
+
+  function openDay(iso:string){
+    setDate(iso)
+    setViewMode('day')
+  }
+
+  function appointmentsForDay(iso:string){
+    return personFiltered.filter(a=>localISODate(new Date(a.starts_at))===iso).sort((a,b)=>a.starts_at.localeCompare(b.starts_at))
+  }
+
+  const periodTitle=viewMode==='day'?dateLabel(date):viewMode==='week'
+    ? `${new Intl.DateTimeFormat(locale,{day:'2-digit',month:'short'}).format(new Date(`${weekDays[0]}T12:00:00`))} — ${new Intl.DateTimeFormat(locale,{day:'2-digit',month:'short'}).format(new Date(`${weekDays[6]}T12:00:00`))}`
+    : monthLabel(date)
+
+  return <>
+    <div className="agendaViewSwitch">
+      <button className={viewMode==='day'?'active':''} onClick={()=>setViewMode('day')}>Dia</button>
+      <button className={viewMode==='week'?'active':''} onClick={()=>setViewMode('week')}>Semana</button>
+      <button className={viewMode==='month'?'active':''} onClick={()=>setViewMode('month')}>Mês</button>
+    </div>
+
+    <div className="agendaPeriodBar">
+      <button className="iconButton" onClick={()=>changePeriod(-1)}>‹</button>
+      <button className="periodTitle" onClick={()=>setDate(todayISO())}>{periodTitle}</button>
+      <button className="iconButton" onClick={()=>changePeriod(1)}>›</button>
+      <button className="primary small" onClick={onNew}>+ Marcar</button>
+    </div>
+
+    {manager&&<div className="segmented agendaPeopleSwitch"><button className={mode==='mine'?'active':''} onClick={()=>setMode('mine')}>Minha agenda</button><button className={mode==='team'?'active':''} onClick={()=>setMode('team')}>Equipa</button></div>}
+
+    {viewMode==='day'&&<>
+      <div className="dayTitle">{dateLabel(date)}{!manager&&<span className="tag">{membership.display_name}</span>}</div>
+      <div className="timeline">{items.length?items.map(a=>{const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id);return <div className="timeRow" key={a.id}><div className="time">{hhmm(a.starts_at)}</div><article className="bookingCard"><button className="bookingMain" onClick={()=>onOpen(a)}><strong>{client?.name||'Cliente'}</strong><span>{service?.name||'Serviço'} · {member?.display_name}</span>{a.notes&&<small>{a.notes}</small>}</button><button className="calendarBtn" onClick={()=>onICS(a)} title="Adicionar ao calendário">▣</button></article></div>}):<Empty>Sem marcações neste dia.</Empty>}</div>
+    </>}
+
+    {viewMode==='week'&&<div className="weekAgenda">
+      {weekDays.map(day=>{
+        const dayItems=appointmentsForDay(day)
+        const isToday=day===todayISO()
+        return <section className={`weekDayCard ${isToday?'today':''}`} key={day}>
+          <button className="weekDayHead" onClick={()=>openDay(day)}>
+            <div><strong>{new Intl.DateTimeFormat(locale,{weekday:'short'}).format(new Date(`${day}T12:00:00`))}</strong><span>{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'short'}).format(new Date(`${day}T12:00:00`))}</span></div>
+            <span className="tag">{dayItems.length}</span>
+          </button>
+          {dayItems.length?<div className="weekBookings">{dayItems.map(a=>{
+            const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id)
+            return <button className="weekBooking" key={a.id} onClick={()=>onOpen(a)}><span>{hhmm(a.starts_at)}</span><div><strong>{client?.name||'Cliente'}</strong><small>{service?.name||'Serviço'} · {member?.display_name||''}</small></div></button>
+          })}</div>:<div className="weekEmpty">Sem marcações</div>}
+        </section>
+      })}
+    </div>}
+
+    {viewMode==='month'&&<div className="monthCalendar">
+      <div className="monthWeekdays">{['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d=><span key={d}>{d}</span>)}</div>
+      <div className="monthGrid">{monthDays.map(day=>{
+        const count=appointmentsForDay(day).length
+        const d=new Date(`${day}T12:00:00`)
+        const outside=d.getMonth()!==monthDate.getMonth()
+        const isToday=day===todayISO()
+        const selected=day===date
+        return <button key={day} className={`monthDay ${outside?'outside':''} ${isToday?'today':''} ${selected?'selected':''}`} onClick={()=>openDay(day)}>
+          <span className="monthDayNumber">{d.getDate()}</span>
+          {count>0&&<span className="monthCount">{count}</span>}
+        </button>
+      })}</div>
+      <div className="monthLegend">Toca num dia para abrir a agenda diária.</div>
+    </div>}
+  </>
 }
 
 function ClientsView({clients,visits,query,setQuery,onNew,onOpen}:{clients:Client[];visits:Visit[];query:string;setQuery:(q:string)=>void;onNew:()=>void;onOpen:(c:Client)=>void}){
