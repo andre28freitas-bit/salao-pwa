@@ -8,7 +8,7 @@ import LandingPage from './LandingPage'
 type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
 type Member = { id:string; salon_id:string; user_id:string|null; display_name:string; role:Role; active:boolean }
-type Service = { id:string; salon_id:string; name:string; duration_minutes:number; price:number; recurrence_weeks:number|null; active:boolean }
+type Service = { id:string; salon_id:string; name:string; duration_minutes:number; price:number; recurrence_weeks:number|null; image_url:string|null; active:boolean }
 type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null }
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
 type Visit = { id:string; salon_id:string; client_id:string; appointment_id:string|null; employee_id:string; service_id:string|null; occurred_on:string; service_label:string|null; color_formula:string|null; treatment_products:string|null; notes:string|null; amount_paid:number }
@@ -44,6 +44,20 @@ function firstName(name:string){ return name.trim().split(/\s+/)[0] || name }
 function weeksBetween(date:string){ return Math.floor((Date.now()-new Date(`${date}T12:00:00`).getTime())/(7*864e5)) }
 function phoneDigits(phone:string|null){ return (phone||'').replace(/\D/g,'') }
 function comparablePhone(phone:string|null){ const p=phoneDigits(phone); return p.length>9?p.slice(-9):p }
+async function uploadSalonPublicImage(salonId:string,file:File,folder:'logo'|'services'){
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Usa uma imagem JPG, PNG ou WebP.')
+  if(file.size>5*1024*1024) throw new Error('A imagem deve ter no máximo 5 MB.')
+
+  const {error:functionError}=await supabase.functions.invoke('ensure-salon-public-assets',{body:{salon_id:salonId}})
+  if(functionError) throw new Error(functionError.message)
+
+  const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg'
+  const path=`${salonId}/${folder}/${Date.now()}-${crypto.randomUUID()}.${ext}`
+  const {error:uploadError}=await supabase.storage.from('salon-public-assets').upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type})
+  if(uploadError) throw new Error(uploadError.message)
+  const {data}=supabase.storage.from('salon-public-assets').getPublicUrl(path)
+  return data.publicUrl
+}
 function whatsApp(phone:string|null,text:string){ const p=phoneDigits(phone); if(!p) return alert('Esta cliente não tem número de telemóvel.'); window.open(`https://wa.me/${p}?text=${encodeURIComponent(text)}`,'_blank') }
 function smsMessage(phone:string|null,text:string){ const p=phoneDigits(phone); if(!p) return alert('Esta cliente não tem número de telemóvel.'); const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent); window.location.href=`sms:${p}${isiOS?'&':'?'}body=${encodeURIComponent(text)}` }
 function appointmentReminderMessage(clientName:string,serviceName:string,time:string){ return `Olá ${clientName},\n\nRelembramos que amanhã tem ${serviceName} agendado para amanhã às ${time}.\n\nObrigado` }
@@ -456,18 +470,20 @@ function ModalLayer({modal,close,membership,members,services,clients,appointment
 function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:string)=>void}){
   const [loading,setLoading]=useState(true)
   const [busy,setBusy]=useState(false)
-  const [values,setValues]=useState({whatsapp_phone:'',instagram_url:'',address:'',public_phone:''})
+  const [uploading,setUploading]=useState(false)
+  const [values,setValues]=useState({whatsapp_phone:'',instagram_url:'',address:'',public_phone:'',logo_url:''})
 
   useEffect(()=>{
     let alive=true
-    supabase.from('salon_public_settings').select('whatsapp_phone,instagram_url,address,public_phone').eq('salon_id',membership.salon_id).maybeSingle().then(({data,error})=>{
+    supabase.from('salon_public_settings').select('whatsapp_phone,instagram_url,address,public_phone,logo_url').eq('salon_id',membership.salon_id).maybeSingle().then(({data,error})=>{
       if(!alive) return
       if(error) alert(error.message)
       if(data) setValues({
         whatsapp_phone:data.whatsapp_phone||'',
         instagram_url:data.instagram_url||'',
         address:data.address||'',
-        public_phone:data.public_phone||''
+        public_phone:data.public_phone||'',
+        logo_url:data.logo_url||''
       })
       setLoading(false)
     })
@@ -475,6 +491,16 @@ function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:str
   },[membership.salon_id])
 
   function set(key:keyof typeof values,value:string){setValues(v=>({...v,[key]:value}))}
+
+  async function uploadLogo(file?:File){
+    if(!file) return
+    setUploading(true)
+    try{
+      const url=await uploadSalonPublicImage(membership.salon_id,file,'logo')
+      set('logo_url',url)
+    }catch(err:any){alert(err?.message||'Não foi possível carregar o logótipo.')}
+    finally{setUploading(false)}
+  }
 
   async function submit(e:FormEvent<HTMLFormElement>){
     e.preventDefault()
@@ -487,6 +513,7 @@ function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:str
       instagram_url:instagram||null,
       address:values.address.trim()||null,
       public_phone:values.public_phone.trim()||null,
+      logo_url:values.logo_url||null,
       updated_at:new Date().toISOString()
     }
     const {error}=await supabase.from('salon_public_settings').upsert(payload,{onConflict:'salon_id'})
@@ -498,6 +525,20 @@ function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:str
   if(loading) return <div className="centerInline">A carregar configurações…</div>
 
   return <form className="formStack siteSettingsForm" onSubmit={submit}>
+    <div className="formSection">
+      <div className="formSectionHead"><strong>Identidade visual</strong><span>Logótipo mostrado no website.</span></div>
+      <div className="imageSettingRow">
+        <div className="imageSettingPreview logoPreview">
+          {values.logo_url?<img src={values.logo_url} alt="Logótipo do salão"/>:<span>Sem logótipo</span>}
+        </div>
+        <label className="secondary uploadLabel">
+          {uploading?'A carregar…':'Escolher logótipo'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>void uploadLogo(e.target.files?.[0])}/>
+        </label>
+      </div>
+      <small className="fieldHint">JPG, PNG ou WebP até 5 MB. Idealmente com fundo transparente.</small>
+    </div>
+
     <div className="formSection">
       <div className="formSectionHead"><strong>Contactos públicos</strong><span>Estes dados aparecem no website.</span></div>
       <label>WhatsApp
@@ -515,7 +556,7 @@ function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:str
         <textarea value={values.address} onChange={e=>set('address',e.target.value)} placeholder="Rua, número, código-postal, localidade"/>
       </label>
     </div>
-    <button className="primary full stickyFormAction" disabled={busy}>{busy?'A guardar…':'Guardar alterações'}</button>
+    <button className="primary full stickyFormAction" disabled={busy||uploading}>{busy?'A guardar…':'Guardar alterações'}</button>
   </form>
 }
 
@@ -587,6 +628,19 @@ function ServicesManager({services,onNew,onEdit}:{services:Service[];onNew:()=>v
 
 function ServiceForm({item,membership,onSaved}:{item?:Service;membership:Member;onSaved:(m:string)=>void}){
   const [busy,setBusy]=useState(false)
+  const [uploading,setUploading]=useState(false)
+  const [imageUrl,setImageUrl]=useState(item?.image_url||'')
+
+  async function uploadImage(file?:File){
+    if(!file) return
+    setUploading(true)
+    try{
+      const url=await uploadSalonPublicImage(membership.salon_id,file,'services')
+      setImageUrl(url)
+    }catch(err:any){alert(err?.message||'Não foi possível carregar a imagem.')}
+    finally{setUploading(false)}
+  }
+
   async function submit(e:FormEvent<HTMLFormElement>){
     e.preventDefault();setBusy(true)
     const fd=new FormData(e.currentTarget)
@@ -596,6 +650,7 @@ function ServiceForm({item,membership,onSaved}:{item?:Service;membership:Member;
       duration_minutes:Number(fd.get('duration_minutes')||45),
       price:Number(fd.get('price')||0),
       recurrence_weeks:Number(fd.get('recurrence_weeks')||0)||null,
+      image_url:imageUrl||null,
       active:true
     }
     if(!payload.name){setBusy(false);return alert('Indica o nome do serviço.')}
@@ -614,6 +669,18 @@ function ServiceForm({item,membership,onSaved}:{item?:Service;membership:Member;
   }
   return <form className="formStack serviceForm" onSubmit={submit}>
     <section className="formSection">
+      <div className="formSectionHead"><div><strong>Imagem do serviço</strong><span>Usada no cartão do website</span></div></div>
+      <div className="serviceImageEditor">
+        <div className="serviceImagePreview">{imageUrl?<img src={imageUrl} alt={item?.name||'Serviço'}/>:<span>Sem imagem personalizada</span>}</div>
+        <label className="secondary uploadLabel">
+          {uploading?'A carregar…':'Escolher imagem'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>void uploadImage(e.target.files?.[0])}/>
+        </label>
+      </div>
+      <small className="fieldHint">JPG, PNG ou WebP até 5 MB. Formato horizontal funciona melhor.</small>
+    </section>
+
+    <section className="formSection">
       <div className="formSectionHead"><div><strong>Serviço</strong><span>Informação usada nas marcações</span></div></div>
       <label>Nome<input name="name" required autoFocus defaultValue={item?.name||''} placeholder="Ex.: Corte"/></label>
       <div className="serviceFormGrid">
@@ -623,8 +690,8 @@ function ServiceForm({item,membership,onSaved}:{item?:Service;membership:Member;
       <label>Recorrência habitual <span className="optionalLabel">opcional</span><div className="inlineUnit"><input name="recurrence_weeks" type="number" inputMode="numeric" min="1" max="52" defaultValue={item?.recurrence_weeks||''} placeholder="Ex.: 5"/><span>semanas</span></div></label>
       <p className="formHint">Ao selecionar este serviço numa marcação, a agenda reserva automaticamente esta duração para o profissional.</p>
     </section>
-    <div className="stickyFormAction"><button className="primary full" disabled={busy}>{busy?'A guardar…':item?'Guardar alterações':'Criar serviço'}</button></div>
-    {item&&<button type="button" className="dangerButton full" disabled={busy} onClick={()=>void archive()}>Desativar serviço</button>}
+    <div className="stickyFormAction"><button className="primary full" disabled={busy||uploading}>{busy?'A guardar…':item?'Guardar alterações':'Criar serviço'}</button></div>
+    {item&&<button type="button" className="dangerButton full" disabled={busy||uploading} onClick={()=>void archive()}>Desativar serviço</button>}
   </form>
 }
 
