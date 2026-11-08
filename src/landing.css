@@ -158,3 +158,129 @@
 @media(prefers-reduced-motion:reduce){
   .salonSite *{scroll-behavior:auto!important;transition:none!important}
 }
+
+/* Public booking request modal */
+.bookingModalBackdrop{
+  position:fixed;inset:0;z-index:120;
+  background:rgba(22,28,20,.48);
+  backdrop-filter:blur(5px);
+  display:grid;place-items:center;
+  padding:18px;
+}
+.bookingModal{
+  width:min(100%,560px);
+  max-height:min(90dvh,760px);
+  overflow:auto;
+  background:#fff;
+  border-radius:24px;
+  padding:24px;
+  box-shadow:0 24px 80px rgba(0,0,0,.22);
+}
+.bookingModalHead{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
+  margin-bottom:18px;
+}
+.bookingModalHead .eyebrowGold{margin-bottom:8px}
+.bookingModalHead h2{
+  margin:0;
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:36px;
+  font-weight:400;
+}
+.bookingClose{
+  border:1px solid var(--site-line);
+  background:white;
+  width:42px;height:42px;border-radius:50%;
+  font-size:25px;line-height:1;color:var(--site-ink);
+  flex:0 0 auto;
+}
+.bookingForm{display:grid;gap:13px}
+.bookingForm label,.periodField legend{
+  font-size:12px;font-weight:800;color:var(--site-ink)
+}
+.bookingForm input,.bookingForm select,.bookingForm textarea{
+  width:100%;
+  margin-top:6px;
+  border:1px solid var(--site-line);
+  border-radius:13px;
+  background:#fff;
+  padding:12px 13px;
+  color:var(--site-ink);
+  outline:none;
+}
+.bookingForm input,.bookingForm select{min-height:48px}
+.bookingForm textarea{min-height:82px;resize:vertical}
+.bookingForm input:focus,.bookingForm select:focus,.bookingForm textarea:focus{
+  border-color:#9b9e8f;
+  box-shadow:0 0 0 3px rgba(36,67,33,.07);
+}
+.bookingForm label small{font-weight:500;color:var(--site-muted)}
+.periodField{border:0;padding:0;margin:0}
+.periodChoice{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px
+}
+.periodChoice label{position:relative}
+.periodChoice input{
+  position:absolute;opacity:0;pointer-events:none;
+}
+.periodChoice span{
+  display:grid;place-items:center;
+  min-height:46px;
+  border:1px solid var(--site-line);
+  border-radius:13px;
+  background:#fff;
+  font-size:13px;font-weight:750;
+  color:var(--site-ink);
+}
+.periodChoice input:checked+span{
+  background:var(--site-green);
+  border-color:var(--site-green);
+  color:white;
+}
+.bookingSubmit{width:100%;min-height:50px;margin-top:2px}
+.bookingFinePrint{
+  margin:0;
+  font-size:10px;
+  line-height:1.5;
+  text-align:center;
+  color:var(--site-muted);
+}
+.bookingSuccess{text-align:center;padding:26px 10px 10px}
+.bookingSuccess>span{
+  width:54px;height:54px;border-radius:50%;
+  background:#e7efe5;color:var(--site-green);
+  display:grid;place-items:center;
+  font-size:27px;font-weight:900;
+  margin:0 auto 14px;
+}
+.bookingSuccess h3{
+  margin:0 0 8px;
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:30px;font-weight:400;
+}
+.bookingSuccess p{
+  max-width:390px;margin:0 auto 22px;
+  color:var(--site-muted);line-height:1.6;font-size:14px
+}
+@media(max-width:620px){
+  .bookingModalBackdrop{padding:0;align-items:end}
+  .bookingModal{
+    width:100%;
+    max-height:94dvh;
+    border-radius:24px 24px 0 0;
+    padding:20px 18px max(18px,env(safe-area-inset-bottom));
+  }
+  .bookingModalHead{
+    position:sticky;top:-20px;z-index:2;
+    background:white;
+    padding:20px 0 10px;
+    margin-bottom:10px;
+  }
+  .bookingModalHead h2{font-size:32px}
+  .bookingForm{gap:11px}
+  .bookingForm input,.bookingForm select{min-height:46px}
+  .bookingSubmit{
+    position:sticky;bottom:0;z-index:2;
+    box-shadow:0 -12px 20px rgba(255,255,255,.92);
+  }
+}
