@@ -284,3 +284,58 @@
     box-shadow:0 -12px 20px rgba(255,255,255,.92);
   }
 }
+
+/* Mobile-only sticky conversion actions */
+.mobileStickyBooking,.mobileWhatsApp{display:none}
+@media(max-width:620px){
+  .salonSite{padding-bottom:84px}
+  .mobileStickyBooking{
+    display:block;
+    position:fixed;
+    left:0;right:0;bottom:0;
+    z-index:95;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(255,255,255,.96);
+    border-top:1px solid rgba(222,216,205,.9);
+    backdrop-filter:blur(16px);
+    box-shadow:0 -8px 24px rgba(34,45,30,.10);
+  }
+  .mobileStickyBooking button{
+    width:100%;
+    min-height:52px;
+    border:0;
+    border-radius:14px;
+    background:var(--site-green);
+    color:#fff;
+    font-weight:850;
+    font-size:14px;
+    letter-spacing:.01em;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    box-shadow:0 5px 16px rgba(36,67,33,.18);
+  }
+  .mobileStickyBooking button:active{transform:translateY(1px)}
+  .mobileWhatsApp{
+    display:grid;
+    place-items:center;
+    position:fixed;
+    right:16px;
+    bottom:calc(82px + env(safe-area-inset-bottom));
+    z-index:96;
+    width:52px;
+    height:52px;
+    border:0;
+    border-radius:50%;
+    background:#25D366;
+    box-shadow:0 8px 24px rgba(0,0,0,.22);
+    padding:0;
+  }
+  .mobileWhatsApp svg{
+    width:28px;
+    height:28px;
+    fill:#fff;
+    display:block;
+  }
+}
