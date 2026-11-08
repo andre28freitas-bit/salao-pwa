@@ -357,16 +357,33 @@ function ClientForm({item,prefill,membership,services,members,onSaved}:{item?:Cl
     const {error}=await q;setBusy(false)
     if(error)alert(error.message);else onSaved(item?'Cliente atualizado.':'Cliente criado.')
   }
-  return <form className="formStack" onSubmit={submit}>
-    <label>Nome<input name="name" required defaultValue={item?.name||prefill?.name||''}/></label>
-    <label>Telemóvel<input name="phone" inputMode="tel" defaultValue={item?.phone||prefill?.phone||''}/></label>
-    <label>Email<input name="email" type="email" defaultValue={item?.email||''}/></label>
-    <label>Data de aniversário<input name="birth_date" type="date" defaultValue={item?.birth_date||''}/></label>
-    <label>Profissional habitual<select name="preferred_employee_id" defaultValue={item?.preferred_employee_id||''}><option value="">Sem profissional definido</option>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select><small className="muted">Ao marcar a partir desta ficha, este profissional fica pré-selecionado. Pode ser alterado em cada marcação.</small></label>
-    <label>Serviço habitual<select name="preferred_service_id" defaultValue={item?.preferred_service_id||services[0]?.id||''}><option value="">Sem preferência</option>{services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-    <label>Recorrência (semanas)<input name="recurrence_weeks" type="number" min="1" defaultValue={item?.recurrence_weeks||''} placeholder="Ex.: 5"/></label>
-    <label>Observações<textarea name="notes" defaultValue={item?.notes||''}/></label>
-    <button className="primary full" disabled={busy}>Guardar cliente</button>
+  return <form className="formStack clientEditForm" onSubmit={submit}>
+    <section className="formSection">
+      <div className="formSectionHead"><div><strong>Dados pessoais</strong><span>Contacto e aniversário</span></div></div>
+      <label className="nameField">Nome<input name="name" required autoComplete="name" defaultValue={item?.name||prefill?.name||''} placeholder="Nome da cliente"/></label>
+      <div className="clientContactFields">
+        <label>Telemóvel<input name="phone" type="tel" inputMode="tel" autoComplete="tel" defaultValue={item?.phone||prefill?.phone||''} placeholder="9xx xxx xxx"/></label>
+        <label>Email <span className="optionalLabel">opcional</span><input name="email" type="email" autoComplete="email" defaultValue={item?.email||''} placeholder="email@exemplo.pt"/></label>
+      </div>
+      <label>Aniversário <span className="optionalLabel">opcional</span><input name="birth_date" type="date" defaultValue={item?.birth_date||''}/></label>
+    </section>
+
+    <section className="formSection">
+      <div className="formSectionHead"><div><strong>Preferências</strong><span>Usadas para acelerar novas marcações</span></div></div>
+      <label>Profissional habitual<select name="preferred_employee_id" defaultValue={item?.preferred_employee_id||''}><option value="">Sem profissional definido</option>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select></label>
+      <div className="preferenceFields">
+        <label>Serviço habitual<select name="preferred_service_id" defaultValue={item?.preferred_service_id||services[0]?.id||''}><option value="">Sem preferência</option>{services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+        <label>Repetir a cada <span className="optionalLabel">semanas</span><input name="recurrence_weeks" type="number" inputMode="numeric" min="1" max="52" defaultValue={item?.recurrence_weeks||''} placeholder="Ex.: 5"/></label>
+      </div>
+      <p className="formHint">Estas preferências ficam pré-selecionadas quando crias uma nova marcação.</p>
+    </section>
+
+    <section className="formSection">
+      <div className="formSectionHead"><div><strong>Notas</strong><span>Informação útil para a equipa</span></div></div>
+      <label className="srOnlyLabel">Observações<textarea name="notes" defaultValue={item?.notes||''} placeholder="Ex.: preferências, alergias, detalhes importantes…"/></label>
+    </section>
+
+    <div className="stickyFormAction"><button className="primary full" disabled={busy}>{busy?'A guardar…':item?'Guardar alterações':'Criar cliente'}</button></div>
   </form>
 }
 
