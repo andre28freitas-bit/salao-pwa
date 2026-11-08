@@ -213,7 +213,13 @@ export default function LandingPage({ onLogin }: LandingPageProps){
         </svg>
       </button>
       <div className="mobileStickyBooking">
-        <button onClick={()=>book()}><span aria-hidden="true">▣</span> Agendar serviço</button>
+        <button onClick={()=>book()}>
+          <svg className="bookingCalendarIcon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 3v3M17 3v3M4.5 8.5h15M6.5 5h11a2 2 0 0 1 2 2v10.5a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/>
+            <path d="m9.2 13 1.8 1.8 3.8-4"/>
+          </svg>
+          Agendar serviço
+        </button>
       </div>
     </>}
 
