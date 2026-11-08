@@ -81,8 +81,41 @@
 .spaceCopy{padding:70px clamp(30px,6vw,90px);display:flex;flex-direction:column;justify-content:center}
 .spaceCopy h2{font-size:clamp(38px,4vw,60px);line-height:1.02;margin:0 0 20px}
 .spaceCopy>p:not(.eyebrowGold){font-size:15px;line-height:1.7;color:var(--site-muted);max-width:550px;margin:0 0 24px}
-.siteTextLink{align-self:flex-start;border:0;background:transparent;color:var(--site-green);font-weight:800;padding:8px 0;border-bottom:1px solid #9aaa92}
-.siteTextLink span{margin-left:8px}
+.siteTextLink{
+  align-self:flex-start;
+  display:inline-flex;
+  align-items:center;
+  gap:12px;
+  border:0;
+  background:transparent;
+  color:var(--site-green);
+  font-weight:800;
+  font-size:15px;
+  letter-spacing:.01em;
+  padding:9px 0 10px;
+  border-bottom:1px solid rgba(36,67,33,.48);
+  transition:border-color .2s ease,color .2s ease;
+}
+.siteTextLink span{
+  width:30px;
+  height:30px;
+  margin-left:2px;
+  border:1px solid rgba(181,138,55,.58);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:var(--site-green);
+  background:rgba(255,255,255,.52);
+  font-size:16px;
+  line-height:1;
+  transition:transform .2s ease,background .2s ease,border-color .2s ease;
+}
+.siteTextLink:hover{border-bottom-color:var(--site-green)}
+.siteTextLink:hover span{
+  transform:translateX(3px);
+  background:#fff;
+  border-color:var(--site-gold);
+}
 
 .resultsSection{background:#fff}
 .sectionIntro.compact{margin-bottom:30px}
@@ -420,5 +453,18 @@
   .mobileWhatsApp{
     right:16px;
     bottom:calc(84px + env(safe-area-inset-bottom));
+  }
+}
+
+@media(max-width:620px){
+  .siteTextLink{
+    font-size:17px;
+    padding:11px 0 12px;
+    border-bottom-width:1.5px;
+  }
+  .siteTextLink span{
+    width:34px;
+    height:34px;
+    font-size:18px;
   }
 }
