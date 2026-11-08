@@ -320,6 +320,7 @@ export default function LandingPage({ onLogin }: LandingPageProps){
             <div className="periodChoice">
               <label><input type="radio" name="preferred_period" value="morning" required/><span>Manhã</span></label>
               <label><input type="radio" name="preferred_period" value="afternoon" required/><span>Tarde</span></label>
+              <label><input type="radio" name="preferred_period" value="no_preference" required/><span>Não tenho preferência</span></label>
             </div>
           </fieldset>
 
