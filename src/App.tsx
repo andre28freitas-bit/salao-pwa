@@ -27,6 +27,7 @@ type Modal =
   | { kind:'staff' }
   | { kind:'services' }
   | { kind:'service'; item?:Service }
+  | { kind:'siteSettings' }
   | null
 
 const locale = 'pt-PT'
@@ -253,7 +254,7 @@ export default function App(){
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
-      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onWebsite={()=>{window.location.href='/?site=1'}} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
+      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onWebsite={()=>{window.location.href='/?site=1'}} onSiteSettings={()=>setModal({kind:'siteSettings'})} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
     </main>
 
     <nav className="bottomNav">
@@ -436,12 +437,86 @@ function StockView({products,query,setQuery,onScan,onNew,onEdit,onChange}:{produ
   return <><div className="stockActions"><button className="primary" onClick={onScan}>▣ Scan código</button><button className="secondary" onClick={onNew}>+ Produto</button></div><div className="searchRow"><input type="search" placeholder="Produto, marca ou código…" value={query} onChange={e=>setQuery(e.target.value)} /></div><div className="stack">{arr.map(p=><ProductCard key={p.id} p={p} actions={<><button className="mini" onClick={()=>onChange(p,-1)}>−1</button><button className="mini" onClick={()=>onChange(p,1)}>+1</button><button className="mini" onClick={()=>onEdit(p)}>Editar</button></>} />)}</div></>
 }
 
-function MoreView({membership,salon,manager,onWebsite,onServices,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onWebsite:()=>void;onServices:()=>void;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
-  return <div className="stack"><div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div><button className="menuCard" onClick={onWebsite}><span>↗</span><div><strong>Ver website</strong><small>Pré-visualizar a homepage pública do salão.</small></div><b>›</b></button>{manager&&<button className="menuCard" onClick={onServices}><span>✂︎</span><div><strong>Serviços</strong><small>Preços, duração e recorrência dos serviços do salão.</small></div><b>›</b></button>}{manager&&<button className="menuCard" onClick={onAddStaff}><span>👤</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}{manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador com acesso</strong><small>Envia um convite por email para usar a aplicação.</small></div><b>›</b></button>}<button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button></div>
+function MoreView({membership,salon,manager,onWebsite,onSiteSettings,onServices,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
+  return <div className="stack">
+    <div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>
+    <button className="menuCard" onClick={onWebsite}><span>↗</span><div><strong>Ver website</strong><small>Pré-visualizar a homepage pública do salão.</small></div><b>›</b></button>
+    {manager&&<button className="menuCard" onClick={onSiteSettings}><span>⚙︎</span><div><strong>Website e contactos</strong><small>WhatsApp, Instagram, morada e telefone visíveis no website.</small></div><b>›</b></button>}
+    {manager&&<button className="menuCard" onClick={onServices}><span>✂︎</span><div><strong>Serviços</strong><small>Preços, duração e recorrência dos serviços do salão.</small></div><b>›</b></button>}
+    {manager&&<button className="menuCard" onClick={onAddStaff}><span>👤</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}
+    {manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador com acesso</strong><small>Envia um convite por email para usar a aplicação.</small></div><b>›</b></button>}
+    <button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button>
+  </div>
 }
 
 function ModalLayer({modal,close,membership,members,services,clients,appointments,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void}){
-  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} presetService={modal.presetService} presetDate={modal.presetDate} presetTime={modal.presetTime} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={async message=>{if(modal.bookingRequestId)await supabase.from('booking_requests').update({status:'booked',updated_at:new Date().toISOString()}).eq('id',modal.bookingRequestId);onSaved(message)}} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}</div></div>
+  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} presetService={modal.presetService} presetDate={modal.presetDate} presetTime={modal.presetTime} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={async message=>{if(modal.bookingRequestId)await supabase.from('booking_requests').update({status:'booked',updated_at:new Date().toISOString()}).eq('id',modal.bookingRequestId);onSaved(message)}} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}{modal.kind==='siteSettings'&&<SiteSettingsForm membership={membership} onSaved={onSaved} />}</div></div>
+}
+
+function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:string)=>void}){
+  const [loading,setLoading]=useState(true)
+  const [busy,setBusy]=useState(false)
+  const [values,setValues]=useState({whatsapp_phone:'',instagram_url:'',address:'',public_phone:''})
+
+  useEffect(()=>{
+    let alive=true
+    supabase.from('salon_public_settings').select('whatsapp_phone,instagram_url,address,public_phone').eq('salon_id',membership.salon_id).maybeSingle().then(({data,error})=>{
+      if(!alive) return
+      if(error) alert(error.message)
+      if(data) setValues({
+        whatsapp_phone:data.whatsapp_phone||'',
+        instagram_url:data.instagram_url||'',
+        address:data.address||'',
+        public_phone:data.public_phone||''
+      })
+      setLoading(false)
+    })
+    return ()=>{alive=false}
+  },[membership.salon_id])
+
+  function set(key:keyof typeof values,value:string){setValues(v=>({...v,[key]:value}))}
+
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    setBusy(true)
+    let instagram=values.instagram_url.trim()
+    if(instagram && !/^https?:\/\//i.test(instagram)) instagram='https://'+instagram
+    const payload={
+      salon_id:membership.salon_id,
+      whatsapp_phone:values.whatsapp_phone.trim()||null,
+      instagram_url:instagram||null,
+      address:values.address.trim()||null,
+      public_phone:values.public_phone.trim()||null,
+      updated_at:new Date().toISOString()
+    }
+    const {error}=await supabase.from('salon_public_settings').upsert(payload,{onConflict:'salon_id'})
+    setBusy(false)
+    if(error) return alert(error.message)
+    onSaved('Website atualizado.')
+  }
+
+  if(loading) return <div className="centerInline">A carregar configurações…</div>
+
+  return <form className="formStack siteSettingsForm" onSubmit={submit}>
+    <div className="formSection">
+      <div className="formSectionHead"><strong>Contactos públicos</strong><span>Estes dados aparecem no website.</span></div>
+      <label>WhatsApp
+        <input value={values.whatsapp_phone} onChange={e=>set('whatsapp_phone',e.target.value)} inputMode="tel" placeholder="Ex.: +351 912 345 678"/>
+        <small className="fieldHint">Usado pelo botão flutuante de WhatsApp.</small>
+      </label>
+      <label>Telemóvel / telefone
+        <input value={values.public_phone} onChange={e=>set('public_phone',e.target.value)} inputMode="tel" placeholder="Ex.: 253 000 000"/>
+        <small className="fieldHint">Mostrado na área de contactos do website.</small>
+      </label>
+      <label>Instagram
+        <input value={values.instagram_url} onChange={e=>set('instagram_url',e.target.value)} inputMode="url" placeholder="instagram.com/deboracruzcabeleireiros"/>
+      </label>
+      <label>Morada
+        <textarea value={values.address} onChange={e=>set('address',e.target.value)} placeholder="Rua, número, código-postal, localidade"/>
+      </label>
+    </div>
+    <button className="primary full stickyFormAction" disabled={busy}>{busy?'A guardar…':'Guardar alterações'}</button>
+  </form>
 }
 
 function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,membership,members,services,clients,appointments,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;presetService?:string;presetDate?:string;presetTime?:string;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
@@ -1033,7 +1108,7 @@ function Section({title,children}:{title:string;children:ReactNode}){return <sec
 function Empty({children}:{children:ReactNode}){return <div className="empty">{children}</div>}
 function InfoCard({label,children}:{label:string;children:ReactNode}){return <div className="infoCard"><span>{label}</span><strong>{children}</strong></div>}
 
-function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):'Convidar colaborador'}
+function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):m.kind==='siteSettings'?'Website e contactos':'Convidar colaborador'}
 function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Conta'} as const)[v]}
 function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Mais'} as const)[v]}
 function navIcon(v:View){return ({today:'⌂',agenda:'□',clients:'♙',alerts:'!',stock:'▤',more:'•••'} as const)[v]}
