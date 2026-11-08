@@ -8,7 +8,7 @@ type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
 type Member = { id:string; salon_id:string; user_id:string|null; display_name:string; role:Role; active:boolean }
 type Service = { id:string; salon_id:string; name:string; duration_minutes:number; price:number; recurrence_weeks:number|null; active:boolean }
-type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null }
+type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null }
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
 type Visit = { id:string; salon_id:string; client_id:string; appointment_id:string|null; employee_id:string; service_id:string|null; occurred_on:string; service_label:string|null; color_formula:string|null; treatment_products:string|null; notes:string|null; amount_paid:number }
 type Product = { id:string; salon_id:string; name:string; brand:string|null; barcode:string|null; unit:string; current_stock:number; min_stock:number; active:boolean }
@@ -38,6 +38,22 @@ function phoneDigits(phone:string|null){ return (phone||'').replace(/\D/g,'') }
 function whatsApp(phone:string|null,text:string){ const p=phoneDigits(phone); if(!p) return alert('Esta cliente não tem número de telemóvel.'); window.open(`https://wa.me/${p}?text=${encodeURIComponent(text)}`,'_blank') }
 function smsMessage(phone:string|null,text:string){ const p=phoneDigits(phone); if(!p) return alert('Esta cliente não tem número de telemóvel.'); const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent); window.location.href=`sms:${p}${isiOS?'&':'?'}body=${encodeURIComponent(text)}` }
 function appointmentReminderMessage(clientName:string,serviceName:string,time:string){ return `Olá ${clientName},\n\nRelembramos que amanhã tem ${serviceName} agendado para amanhã às ${time}.\n\nObrigado` }
+function birthdayMessage(clientName:string){ return `Olá ${firstName(clientName)},\n\nSó para te desejar um feliz aniversário! 🎉\nQue tenhas um excelente dia.\n\nObrigado` }
+function isLeapYear(year:number){ return year%4===0 && (year%100!==0 || year%400===0) }
+function nextBirthday(birthDate:string,from=new Date()){
+  const parts=birthDate.split('-').map(Number)
+  const month=parts[1], day=parts[2]
+  if(!month||!day) return null
+  const base=new Date(from.getFullYear(),from.getMonth(),from.getDate(),12,0,0,0)
+  const make=(year:number)=>{
+    const safeDay=month===2&&day===29&&!isLeapYear(year)?28:day
+    return new Date(year,month-1,safeDay,12,0,0,0)
+  }
+  let date=make(base.getFullYear())
+  if(date<base) date=make(base.getFullYear()+1)
+  const daysUntil=Math.round((date.getTime()-base.getTime())/864e5)
+  return {date,daysUntil}
+}
 
 function downloadICS(a:Appointment, c?:Client, s?:Service, employee?:Member){
   const stamp=(iso:string)=>new Date(iso).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'')
@@ -143,6 +159,11 @@ export default function App(){
 
   const todayAppointments=useMemo(()=>appointments.filter(a=>localISODate(new Date(a.starts_at))===todayISO() && a.status!=='cancelled').sort((a,b)=>a.starts_at.localeCompare(b.starts_at)),[appointments])
   const tomorrowAppointments=useMemo(()=>appointments.filter(a=>localISODate(new Date(a.starts_at))===addDays(todayISO(),1) && a.status!=='cancelled').sort((a,b)=>a.starts_at.localeCompare(b.starts_at)),[appointments])
+  const upcomingBirthdays=useMemo(()=>clients.flatMap(client=>{
+    if(!client.birth_date) return []
+    const next=nextBirthday(client.birth_date)
+    return next && next.daysUntil>=0 && next.daysUntil<=6 ? [{client,date:next.date,daysUntil:next.daysUntil}] : []
+  }).sort((a,b)=>a.daysUntil-b.daysUntil||a.client.name.localeCompare(b.client.name)),[clients])
 
   const retention=useMemo(()=>clients.map(c=>{
     const history=visits.filter(v=>v.client_id===c.id).sort((a,b)=>b.occurred_on.localeCompare(a.occurred_on))
@@ -168,7 +189,7 @@ export default function App(){
     </header>
 
     <main className="content">
-      {view==='today' && <TodayView appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
+      {view==='today' && <TodayView appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
@@ -231,14 +252,17 @@ function Onboarding({onDone,onToast}:{onDone:()=>void;onToast:(m:string)=>void})
   return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><h1>Primeira configuração</h1><div className="segmented"><button className={tab==='create'?'active':''} onClick={()=>setTab('create')}>Criar salão</button><button className={tab==='join'?'active':''} onClick={()=>setTab('join')}>Tenho convite</button></div><form onSubmit={submit} className="formStack"><label>{tab==='create'?'Nome do salão':'Código do convite'}<input name="value" required placeholder={tab==='create'?'Ex.: Studio Maria':'Ex.: A4F91C2D'} /></label><button className="primary full" disabled={busy}>{tab==='create'?'Criar e continuar':'Entrar no salão'}</button></form></div></div>
 }
 
-function TodayView({appointments,tomorrowAppointments,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook}:{appointments:Appointment[];tomorrowAppointments:Appointment[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void}){
+function TodayView({appointments,tomorrowAppointments,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook}:{appointments:Appointment[];tomorrowAppointments:Appointment[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void}){
   return <><div className="dateStrip"><div><div className="muted cap">{dateLabel(todayISO()).split(',')[0]}</div><strong>{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date())}</strong></div><button className="primary small" onClick={onNew}>+ Marcação</button></div>
-  <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/><Kpi label="Stock" value={lowStock.length} sub="alertas"/></div>
+  <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/><Kpi label="Aniversários" value={upcomingBirthdays.length} sub="7 dias"/></div>
   <Section title={`Confirmar amanhã (${tomorrowAppointments.length})`}>
     {tomorrowAppointments.length?tomorrowAppointments.map(a=>{
       const client=clientBy(a.client_id), service=serviceBy(a.service_id), member=memberBy(a.employee_id)
       return <TomorrowConfirmationCard key={a.id} a={a} c={client} s={service} m={member} onClient={()=>client&&onClient(client)} />
     }):<Empty>Sem marcações para confirmar amanhã.</Empty>}
+  </Section>
+  <Section title={`Aniversários — próximos 7 dias (${upcomingBirthdays.length})`}>
+    {upcomingBirthdays.length?upcomingBirthdays.map(item=><BirthdayCard key={item.client.id} client={item.client} date={item.date} daysUntil={item.daysUntil} onClient={()=>onClient(item.client)} />):<Empty>Sem aniversários nos próximos 7 dias.</Empty>}
   </Section>
   <Section title="Marcações de hoje">{appointments.length?appointments.slice(0,5).map(a=><AppointmentCard key={a.id} a={a} c={clientBy(a.client_id)} s={serviceBy(a.service_id)} m={memberBy(a.employee_id)} salonName={salonName} onClient={()=>clientBy(a.client_id)&&onClient(clientBy(a.client_id)!)} />):<Empty>Sem marcações para hoje.</Empty>}</Section>
   <Section title="Clientes a recuperar">{retention.length?retention.slice(0,4).map((r:any)=><RetentionCard key={r.client.id} r={r} onBook={()=>onBook(r.client)}/>):<Empty>Nenhuma cliente em atraso.</Empty>}</Section></>
@@ -323,6 +347,7 @@ function ClientForm({item,prefill,membership,services,members,onSaved}:{item?:Cl
       name:String(fd.get('name')),
       phone:String(fd.get('phone')||'')||null,
       email:String(fd.get('email')||'')||null,
+      birth_date:String(fd.get('birth_date')||'')||null,
       preferred_service_id:String(fd.get('preferred_service_id')||'')||null,
       preferred_employee_id:String(fd.get('preferred_employee_id')||'')||null,
       recurrence_weeks:Number(fd.get('recurrence_weeks')||0)||null,
@@ -336,6 +361,7 @@ function ClientForm({item,prefill,membership,services,members,onSaved}:{item?:Cl
     <label>Nome<input name="name" required defaultValue={item?.name||prefill?.name||''}/></label>
     <label>Telemóvel<input name="phone" inputMode="tel" defaultValue={item?.phone||prefill?.phone||''}/></label>
     <label>Email<input name="email" type="email" defaultValue={item?.email||''}/></label>
+    <label>Data de aniversário<input name="birth_date" type="date" defaultValue={item?.birth_date||''}/></label>
     <label>Profissional habitual<select name="preferred_employee_id" defaultValue={item?.preferred_employee_id||''}><option value="">Sem profissional definido</option>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select><small className="muted">Ao marcar a partir desta ficha, este profissional fica pré-selecionado. Pode ser alterado em cada marcação.</small></label>
     <label>Serviço habitual<select name="preferred_service_id" defaultValue={item?.preferred_service_id||services[0]?.id||''}><option value="">Sem preferência</option>{services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
     <label>Recorrência (semanas)<input name="recurrence_weeks" type="number" min="1" defaultValue={item?.recurrence_weeks||''} placeholder="Ex.: 5"/></label>
@@ -350,7 +376,7 @@ function ClientDetail({client,appointments,visits,services,memberBy,onEdit,onBoo
   const nextAppointment=appointments.filter(a=>a.client_id===client.id && !['cancelled','completed','no_show'].includes(a.status) && new Date(a.starts_at).getTime()>=Date.now()).sort((a,b)=>a.starts_at.localeCompare(b.starts_at))[0]
   const nextService=nextAppointment?services.find(s=>s.id===nextAppointment.service_id):undefined
   const reminder=nextAppointment?appointmentReminderMessage(client.name,nextService?.name||'serviço',hhmm(nextAppointment.starts_at)):`Olá ${client.name},`
-  return <div><div className="clientHero"><div className="bigAvatar">{initials(client.name)}</div><div><h3>{client.name}</h3><span>{client.phone||'Sem telefone'}</span></div></div>{client.phone&&<><div className="contactGrid"><button className="secondary" onClick={()=>whatsApp(client.phone,reminder)}>WhatsApp</button><button className="secondary" onClick={()=>smsMessage(client.phone,reminder)}>SMS</button></div>{nextAppointment&&<p className="muted small" style={{marginTop:-4}}>Lembrete: {nextService?.name||'Serviço'} · {hhmm(nextAppointment.starts_at)}</p>}</>}<div className="quickActions"><button className="secondary" onClick={onBook}>+ Marcar</button><button className="secondary" onClick={onEdit}>Editar</button></div>{client.preferred_employee_id&&<InfoCard label="Profissional habitual">{memberBy(client.preferred_employee_id)?.display_name||'Profissional'}</InfoCard>}{client.notes&&<InfoCard label="Observações">{client.notes}</InfoCard>}{last&&due&&<InfoCard label="Recorrência">{passed} semanas desde a última visita · habitual {due}</InfoCard>}<div className="sectionHead"><h3>Histórico</h3><button className="textButton" onClick={onVisit}>+ Visita</button></div>{history.length?history.map(v=><div className="historyItem" key={v.id}><div><strong>{new Intl.DateTimeFormat(locale).format(new Date(`${v.occurred_on}T12:00:00`))} · {v.service_label||'Serviço'}</strong>{v.color_formula&&<span><b>Cor/fórmula:</b> {v.color_formula}</span>}{v.treatment_products&&<span><b>Tratamento/produtos:</b> {v.treatment_products}</span>}{v.notes&&<span>{v.notes}</span>}<small>{memberBy(v.employee_id)?.display_name}</small></div><b>{money(v.amount_paid)}</b></div>):<Empty>Sem histórico ainda.</Empty>}</div>
+  return <div><div className="clientHero"><div className="bigAvatar">{initials(client.name)}</div><div><h3>{client.name}</h3><span>{client.phone||'Sem telefone'}</span></div></div>{client.phone&&<><div className="contactGrid"><button className="secondary" onClick={()=>whatsApp(client.phone,reminder)}>WhatsApp</button><button className="secondary" onClick={()=>smsMessage(client.phone,reminder)}>SMS</button></div>{nextAppointment&&<p className="muted small" style={{marginTop:-4}}>Lembrete: {nextService?.name||'Serviço'} · {hhmm(nextAppointment.starts_at)}</p>}</>}<div className="quickActions"><button className="secondary" onClick={onBook}>+ Marcar</button><button className="secondary" onClick={onEdit}>Editar</button></div>{client.birth_date&&<InfoCard label="Aniversário">{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date(`${client.birth_date}T12:00:00`))}</InfoCard>}{client.preferred_employee_id&&<InfoCard label="Profissional habitual">{memberBy(client.preferred_employee_id)?.display_name||'Profissional'}</InfoCard>}{client.notes&&<InfoCard label="Observações">{client.notes}</InfoCard>}{last&&due&&<InfoCard label="Recorrência">{passed} semanas desde a última visita · habitual {due}</InfoCard>}<div className="sectionHead"><h3>Histórico</h3><button className="textButton" onClick={onVisit}>+ Visita</button></div>{history.length?history.map(v=><div className="historyItem" key={v.id}><div><strong>{new Intl.DateTimeFormat(locale).format(new Date(`${v.occurred_on}T12:00:00`))} · {v.service_label||'Serviço'}</strong>{v.color_formula&&<span><b>Cor/fórmula:</b> {v.color_formula}</span>}{v.treatment_products&&<span><b>Tratamento/produtos:</b> {v.treatment_products}</span>}{v.notes&&<span>{v.notes}</span>}<small>{memberBy(v.employee_id)?.display_name}</small></div><b>{money(v.amount_paid)}</b></div>):<Empty>Sem histórico ainda.</Empty>}</div>
 }
 
 function VisitForm({client,appointment,membership,serviceBy,onSaved}:{client:Client;appointment?:Appointment;membership:Member;serviceBy:(id:string|null)=>Service|undefined;onSaved:(m:string)=>void}){
@@ -746,6 +772,12 @@ function startClientCreate(setModal:(m:Modal)=>void,showToast:(m:string)=>void){
     if(useImport){ contacts.select(['name','tel'],{multiple:false}).then((rows:any[])=>{if(!rows?.length)return;const row=rows[0];setModal({kind:'client',prefill:{name:Array.isArray(row.name)?row.name[0]:row.name,phone:Array.isArray(row.tel)?row.tel[0]:row.tel}})}).catch(()=>showToast('Não foi possível importar o contacto.')); return }
   }
   setModal({kind:'client'})
+}
+
+function BirthdayCard({client,date,daysUntil,onClient}:{client:Client;date:Date;daysUntil:number;onClient:()=>void}){
+  const text=birthdayMessage(client.name)
+  const label=daysUntil===0?'Hoje 🎂':new Intl.DateTimeFormat(locale,{weekday:'short',day:'2-digit',month:'short'}).format(date)
+  return <article className="card birthdayCard"><div className="cardRow"><span className="timeTag">{label}</span><div className="grow"><strong>{client.name}</strong><span>Aniversário</span><div className="miniActions"><button className="mini" onClick={onClient}>Ficha</button>{client.phone?<><button className="mini dark" onClick={()=>whatsApp(client.phone,text)}>WhatsApp</button><button className="mini" onClick={()=>smsMessage(client.phone,text)}>SMS</button></>:<span className="tag warn">Sem telemóvel</span>}</div></div></div></article>
 }
 
 function TomorrowConfirmationCard({a,c,s,m,onClient}:{a:Appointment;c?:Client;s?:Service;m?:Member;onClient:()=>void}){
