@@ -1,0 +1,85 @@
+.barberSite{
+  --b-black:#171713;
+  --b-ink:#22221d;
+  --b-cream:#f1eee5;
+  --b-white:#faf9f5;
+  --b-copper:#b9824b;
+  --b-line:#d9d2c5;
+  --b-muted:#77756d;
+  min-height:100vh;
+  background:var(--b-white);
+  color:var(--b-ink);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.barberSite *{box-sizing:border-box}
+.barberSite button,.barberSite a{font:inherit}
+.barberHeader{height:86px;padding:0 clamp(22px,5vw,76px);display:grid;grid-template-columns:auto 1fr auto;gap:36px;align-items:center;background:rgba(250,249,245,.96);border-bottom:1px solid var(--b-line);position:sticky;top:0;z-index:50;backdrop-filter:blur(14px)}
+.barberBrand{border:0;background:transparent;padding:0;display:flex;align-items:center;gap:13px;color:var(--b-black);cursor:pointer;text-align:left}
+.barberMark{width:48px;height:48px;border:1.5px solid var(--b-copper);border-radius:50%;display:grid;place-items:center;font-family:Georgia,serif;font-size:21px;font-weight:700;letter-spacing:-.08em;color:var(--b-black)}
+.barberBrand>span:last-child{display:grid;gap:3px}.barberBrand strong{font-size:15px;letter-spacing:.12em}.barberBrand small{font-size:8px;letter-spacing:.25em;color:var(--b-muted)}
+.barberNav{display:flex;justify-content:center;gap:30px}.barberNav button{border:0;background:none;color:var(--b-ink);font-size:12px;font-weight:700;padding:8px;cursor:pointer}
+.barberHeaderCta,.barberPrimary{border:0;background:var(--b-black);color:#fff;border-radius:999px;padding:14px 22px;font-weight:800;font-size:12px;letter-spacing:.04em;cursor:pointer}
+.barberMenu{display:none}
+.barberHero{min-height:720px;position:relative;display:flex;align-items:flex-end;overflow:hidden;background:#111}
+.barberHeroImage,.barberHeroOverlay{position:absolute;inset:0}.barberHeroImage img{width:100%;height:100%;object-fit:cover;display:block}
+.barberHeroOverlay{background:linear-gradient(90deg,rgba(12,12,10,.92) 0%,rgba(12,12,10,.65) 45%,rgba(12,12,10,.12) 80%),linear-gradient(0deg,rgba(12,12,10,.55),transparent 35%)}
+.barberHeroCopy{position:relative;z-index:2;color:#fff;padding:90px clamp(28px,7vw,110px) 116px;max-width:780px}
+.barberEyebrow{font-size:10px;font-weight:900;letter-spacing:.26em;color:var(--b-copper);text-transform:uppercase;margin:0 0 18px}
+.barberHeroCopy h1,.barberSectionHead h2,.barberSpaceCopy h2,.barberSchedule h2,.barberFinalCta h2{font-family:Georgia,serif;font-weight:400;letter-spacing:-.035em}
+.barberHeroCopy h1{font-size:clamp(54px,7vw,96px);line-height:.91;margin:0 0 26px}.barberHeroCopy h1 em,.barberSectionHead h2 em,.barberSpaceCopy h2 em,.barberSchedule h2 em{font-weight:400;color:var(--b-copper)}
+.barberHeroCopy>p:not(.barberEyebrow){max-width:590px;font-size:15px;line-height:1.7;color:rgba(255,255,255,.74);margin:0 0 32px}
+.barberHeroActions{display:flex;gap:12px}.barberHeroActions .barberPrimary{background:var(--b-copper);color:#12110f}
+.barberGhost{border:1px solid rgba(255,255,255,.48);background:rgba(255,255,255,.04);color:#fff;border-radius:999px;padding:13px 22px;font-size:12px;font-weight:750;cursor:pointer}
+.barberHeroMeta{position:absolute;z-index:2;right:clamp(25px,5vw,75px);bottom:34px;display:flex;gap:28px;color:rgba(255,255,255,.62);font-size:10px;text-transform:uppercase;letter-spacing:.13em}
+.barberIntro{display:grid;grid-template-columns:repeat(3,1fr);padding:34px clamp(25px,7vw,110px);background:var(--b-cream);border-bottom:1px solid var(--b-line)}
+.barberIntro>div{padding:6px 34px;border-right:1px solid var(--b-line)}.barberIntro>div:first-child{padding-left:0}.barberIntro>div:last-child{border-right:0}
+.barberIntro span{font-family:Georgia,serif;color:var(--b-copper);font-size:14px}.barberIntro strong{display:block;font-size:13px;margin:5px 0}.barberIntro p{font-size:11px;color:var(--b-muted);margin:0}
+.barberSection{padding:100px clamp(24px,7vw,110px)}
+.barberSectionHead{display:grid;grid-template-columns:1.1fr .9fr;align-items:end;gap:70px;margin-bottom:50px}
+.barberSectionHead h2{font-size:clamp(46px,5vw,72px);line-height:.98;margin:0}.barberSectionHead>p{font-size:14px;line-height:1.8;color:var(--b-muted);max-width:540px;margin:0 0 8px}
+.barberServiceGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.barberServiceCard{background:#fff;border:1px solid var(--b-line);overflow:hidden}
+.barberServiceImage{height:290px;position:relative;overflow:hidden;background:#ddd}.barberServiceImage img{width:100%;height:100%;object-fit:cover;filter:saturate(.82);transition:transform .4s ease}.barberServiceCard:hover img{transform:scale(1.035)}
+.barberServiceImage span{position:absolute;top:13px;left:13px;background:rgba(20,20,17,.9);color:#fff;padding:7px 9px;font-size:9px;letter-spacing:.12em}
+.barberServiceBody{padding:20px;display:flex;gap:16px;align-items:flex-end;justify-content:space-between}.barberServiceBody h3{font-family:Georgia,serif;font-size:24px;margin:0 0 7px}.barberServiceBody p{font-size:11px;line-height:1.55;color:var(--b-muted);margin:0}
+.barberServiceBody button{width:40px;height:40px;border-radius:50%;border:1px solid var(--b-copper);background:transparent;flex:0 0 40px;cursor:pointer;font-size:18px}
+.barberSpace{display:grid;grid-template-columns:.9fr 1.1fr;background:var(--b-black);color:#fff;min-height:590px}
+.barberSpaceCopy{padding:80px clamp(30px,7vw,110px);display:flex;flex-direction:column;justify-content:center}.barberSpaceCopy h2{font-size:clamp(46px,5vw,72px);line-height:1;margin:0 0 25px}.barberSpaceCopy>p:not(.barberEyebrow){font-size:14px;line-height:1.75;color:rgba(255,255,255,.65);max-width:540px}
+.barberSpaceCopy button{align-self:flex-start;margin-top:24px;border:1px solid rgba(185,130,75,.9);background:transparent;color:#fff;border-radius:999px;padding:13px 17px 13px 20px;font-weight:750;cursor:pointer}.barberSpaceCopy button span{margin-left:13px;color:var(--b-copper)}
+.barberSpaceImage{overflow:hidden}.barberSpaceImage img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.75)}
+.barberSchedule{padding:95px clamp(25px,7vw,110px);background:var(--b-cream)}
+.barberScheduleGrid{display:grid;grid-template-columns:1fr 1fr;gap:90px;align-items:start}.barberSchedule h2{font-size:clamp(48px,5vw,74px);line-height:.98;margin:0}
+.barberHours{border-top:1px solid #bfb7a9}.barberHours>div{display:flex;justify-content:space-between;gap:30px;padding:21px 0;border-bottom:1px solid #cfc7ba;font-size:12px}.barberHours span{color:var(--b-muted)}.barberHours strong{font-size:12px}
+.barberFinalCta{padding:65px clamp(25px,7vw,110px);background:var(--b-copper);display:flex;align-items:flex-end;justify-content:space-between;gap:50px}.barberFinalCta .barberEyebrow{color:#3a2a1c}.barberFinalCta h2{font-size:clamp(45px,5vw,70px);line-height:.95;margin:0}.barberPrimary.light{background:var(--b-white);color:var(--b-black);padding:17px 26px}
+.barberFooter{padding:38px clamp(25px,7vw,110px) 105px;display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:35px;background:#11110f;color:#fff;position:relative}
+.barberFooterBrand{display:flex;gap:12px;align-items:center}.barberFooter .barberMark{color:#fff}.barberFooterBrand>div{display:grid}.barberFooterBrand strong{font-size:14px;letter-spacing:.12em}.barberFooterBrand small,.barberFooter>div>small{font-size:8px;letter-spacing:.16em;color:#9c9a91}
+.barberFooter>div:not(.barberFooterBrand){display:grid;gap:8px;align-content:start}.barberFooter a,.barberFooter>div>span{color:#fff;text-decoration:none;font-size:12px}
+.barberDemoNote{position:absolute;right:clamp(25px,7vw,110px);bottom:24px;color:#77756d;font-size:9px;text-transform:uppercase;letter-spacing:.12em}
+.barberWhatsapp,.barberSticky{display:none}
+.barberModalBackdrop{position:fixed;inset:0;background:rgba(10,10,9,.72);z-index:120;display:grid;place-items:center;padding:20px;backdrop-filter:blur(7px)}
+.barberModal{width:min(520px,100%);max-height:90vh;overflow:auto;background:var(--b-white);padding:28px;border-radius:8px;box-shadow:0 30px 80px rgba(0,0,0,.32)}
+.barberModalHead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px}.barberModalHead h2{font-family:Georgia,serif;font-size:34px;margin:0}.barberModalHead button{border:0;background:#e9e5db;width:38px;height:38px;border-radius:50%;font-size:24px;cursor:pointer}
+.barberForm{display:grid;gap:14px}.barberForm label{display:grid;gap:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.barberForm input,.barberForm select{width:100%;height:48px;border:1px solid var(--b-line);background:#fff;border-radius:4px;padding:0 12px;color:var(--b-ink);font-size:14px}.barberForm .barberPrimary{margin-top:5px}.barberForm>small{text-align:center;color:var(--b-muted);font-size:9px}
+.barberSuccess{text-align:center;padding:18px 5px 4px}.barberSuccess>span{display:grid;place-items:center;margin:0 auto 15px;width:50px;height:50px;border-radius:50%;background:var(--b-copper);font-size:22px}.barberSuccess h3{font-family:Georgia,serif;font-size:30px;margin:0 0 10px}.barberSuccess p{color:var(--b-muted);font-size:13px;line-height:1.6;margin:0 auto 22px;max-width:380px}
+@media(max-width:900px){
+  .barberHeader{grid-template-columns:auto 1fr 44px;padding:0 18px;height:78px}.barberHeaderCta{display:none}.barberNav{position:absolute;top:78px;left:0;right:0;background:var(--b-white);border-bottom:1px solid var(--b-line);display:none;flex-direction:column;gap:0;padding:12px 18px 18px}.barberNav.open{display:flex}.barberNav button{text-align:left;padding:13px 4px;border-bottom:1px solid #ece8df}
+  .barberMenu{display:grid;place-items:center;justify-self:end;width:42px;height:42px;border:1px solid var(--b-line);background:#fff;border-radius:8px}.barberMenu svg{width:22px;height:22px;fill:none;stroke:var(--b-black);stroke-width:1.8;stroke-linecap:round}.barberMenu.open{background:var(--b-black)}.barberMenu.open svg{stroke:#fff}
+  .barberHero{min-height:650px}.barberHeroCopy{padding:80px 25px 105px}.barberHeroMeta{left:25px;right:auto;bottom:25px;gap:14px;flex-wrap:wrap}
+  .barberServiceGrid{grid-template-columns:repeat(2,1fr)}.barberSectionHead,.barberScheduleGrid{grid-template-columns:1fr;gap:30px}.barberSpace{grid-template-columns:1fr}.barberSpaceImage{height:420px}.barberFooter{grid-template-columns:1.4fr 1fr;row-gap:30px}
+}
+@media(max-width:620px){
+  .barberSite{padding-bottom:83px}
+  .barberBrand .barberMark{width:42px;height:42px;font-size:18px}.barberBrand strong{font-size:13px}.barberBrand small{font-size:7px}
+  .barberHero{min-height:690px}.barberHeroOverlay{background:linear-gradient(0deg,rgba(12,12,10,.94) 0%,rgba(12,12,10,.68) 52%,rgba(12,12,10,.22) 100%)}.barberHeroCopy{padding:260px 22px 110px;align-self:flex-end}.barberHeroCopy h1{font-size:54px}.barberHeroCopy>p:not(.barberEyebrow){font-size:14px}.barberHeroActions{display:grid;grid-template-columns:1fr}.barberHeroActions button{width:100%}
+  .barberHeroMeta{display:none}
+  .barberIntro{grid-template-columns:1fr;padding:24px 22px}.barberIntro>div,.barberIntro>div:first-child{padding:17px 0;border-right:0;border-bottom:1px solid var(--b-line)}.barberIntro>div:last-child{border-bottom:0}
+  .barberSection{padding:70px 20px}.barberSectionHead h2{font-size:50px}.barberSectionHead>p{font-size:13px}
+  .barberServiceGrid{grid-template-columns:1fr 1fr;gap:9px}.barberServiceImage{height:190px}.barberServiceBody{padding:13px;display:block}.barberServiceBody h3{font-size:20px}.barberServiceBody p{font-size:10px;min-height:47px}.barberServiceBody button{width:34px;height:34px;margin-top:12px}
+  .barberSpaceCopy{padding:65px 22px}.barberSpaceCopy h2{font-size:49px}.barberSpaceImage{height:330px}
+  .barberSchedule{padding:70px 22px}.barberSchedule h2{font-size:50px}.barberHours>div{display:grid;gap:7px}
+  .barberFinalCta{padding:55px 22px;display:grid}.barberFinalCta h2{font-size:50px}.barberFinalCta .barberPrimary{width:100%}
+  .barberFooter{grid-template-columns:1fr 1fr;padding:36px 22px 115px}.barberFooterBrand{grid-column:1/-1}
+  .barberWhatsapp{display:grid;place-items:center;position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:101;width:52px;height:52px;border:0;border-radius:50%;background:#25D366;box-shadow:0 8px 24px rgba(0,0,0,.24)}.barberWhatsapp svg{width:28px;height:28px;fill:#fff}
+  .barberSticky{display:block;position:fixed;left:0;right:0;bottom:0;z-index:100;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:rgba(250,249,245,.97);border-top:1px solid var(--b-line);backdrop-filter:blur(14px)}.barberSticky button{width:100%;min-height:52px;border:0;border-radius:7px;background:var(--b-black);color:#fff;font-weight:850;display:flex;align-items:center;justify-content:center;gap:9px}.barberSticky svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .barberModalBackdrop{align-items:end;padding:0}.barberModal{border-radius:18px 18px 0 0;padding:25px 20px calc(24px + env(safe-area-inset-bottom));max-height:93vh}
+}
