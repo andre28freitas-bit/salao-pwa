@@ -13,11 +13,11 @@ type Client = { id:string; salon_id:string; name:string; phone:string|null; emai
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
 type Visit = { id:string; salon_id:string; client_id:string; appointment_id:string|null; employee_id:string; service_id:string|null; occurred_on:string; service_label:string|null; color_formula:string|null; treatment_products:string|null; notes:string|null; amount_paid:number }
 type Product = { id:string; salon_id:string; name:string; brand:string|null; barcode:string|null; unit:string; current_stock:number; min_stock:number; active:boolean }
-type BookingRequest = { id:string; salon_id:string; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
+type BookingRequest = { id:string; salon_id:string; client_id:string|null; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
 type Salon = { id:string; name:string; timezone:string }
 
 type Modal =
-  | { kind:'appointment'; item?:Appointment; presetClient?:string }
+  | { kind:'appointment'; item?:Appointment; presetClient?:string; presetService?:string; presetDate?:string; presetTime?:string; bookingRequestId?:string }
   | { kind:'client'; item?:Client; prefill?:{name?:string; phone?:string} }
   | { kind:'clientDetail'; client:Client }
   | { kind:'visit'; appointment?:Appointment; client:Client }
@@ -42,6 +42,7 @@ function hhmm(iso:string){ return new Intl.DateTimeFormat(locale,{hour:'2-digit'
 function firstName(name:string){ return name.trim().split(/\s+/)[0] || name }
 function weeksBetween(date:string){ return Math.floor((Date.now()-new Date(`${date}T12:00:00`).getTime())/(7*864e5)) }
 function phoneDigits(phone:string|null){ return (phone||'').replace(/\D/g,'') }
+function comparablePhone(phone:string|null){ const p=phoneDigits(phone); return p.length>9?p.slice(-9):p }
 function whatsApp(phone:string|null,text:string){ const p=phoneDigits(phone); if(!p) return alert('Esta cliente não tem número de telemóvel.'); window.open(`https://wa.me/${p}?text=${encodeURIComponent(text)}`,'_blank') }
 function smsMessage(phone:string|null,text:string){ const p=phoneDigits(phone); if(!p) return alert('Esta cliente não tem número de telemóvel.'); const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent); window.location.href=`sms:${p}${isiOS?'&':'?'}body=${encodeURIComponent(text)}` }
 function appointmentReminderMessage(clientName:string,serviceName:string,time:string){ return `Olá ${clientName},\n\nRelembramos que amanhã tem ${serviceName} agendado para amanhã às ${time}.\n\nObrigado` }
@@ -161,6 +162,49 @@ export default function App(){
     const {error}=await supabase.from('booking_requests').update({status,updated_at:new Date().toISOString()}).eq('id',id)
     if(error) showToast(error.message); else { showToast('Pedido atualizado.'); await loadData() }
   }
+
+  async function convertBookingRequest(request:BookingRequest){
+    if(!membership) return
+    let client=request.client_id?clients.find(x=>x.id===request.client_id):undefined
+    if(!client){
+      const targetPhone=comparablePhone(request.phone)
+      client=clients.find(x=>targetPhone && comparablePhone(x.phone)===targetPhone)
+    }
+
+    if(!client){
+      const {data:newClient,error}=await supabase.from('clients').insert({
+        salon_id:membership.salon_id,
+        name:request.name,
+        phone:request.phone,
+        email:null,
+        birth_date:null,
+        preferred_service_id:null,
+        preferred_employee_id:null,
+        recurrence_weeks:null,
+        notes:null
+      }).select('*').single()
+      if(error){showToast('Não foi possível criar a ficha do cliente: '+error.message);return}
+      client=newClient as Client
+      setClients(prev=>[...prev.filter(x=>x.id!==client!.id),client!].sort((a,b)=>a.name.localeCompare(b.name)))
+    }
+
+    const service=services.find(s=>s.name.trim().toLowerCase()===request.service_name.trim().toLowerCase())
+    await supabase.from('booking_requests').update({
+      client_id:client.id,
+      status:'contacted',
+      updated_at:new Date().toISOString()
+    }).eq('id',request.id)
+
+    setBookingRequests(prev=>prev.map(x=>x.id===request.id?{...x,client_id:client!.id,status:'contacted'}:x))
+    setModal({
+      kind:'appointment',
+      presetClient:client.id,
+      presetService:service?.id,
+      presetDate:request.preferred_date,
+      presetTime:request.preferred_period==='morning'?'09:00':'14:00',
+      bookingRequestId:request.id
+    })
+  }
   const clientBy=(id:string)=>clients.find(x=>x.id===id)
   const serviceBy=(id:string|null)=>services.find(x=>x.id===id)
   const memberBy=(id:string)=>members.find(x=>x.id===id)
@@ -204,7 +248,7 @@ export default function App(){
     </header>
 
     <main className="content">
-      {view==='today' && <TodayView appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} />}
+      {view==='today' && <TodayView clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} />}
       {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
@@ -267,11 +311,11 @@ function Onboarding({onDone,onToast}:{onDone:()=>void;onToast:(m:string)=>void})
   return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><h1>Primeira configuração</h1><div className="segmented"><button className={tab==='create'?'active':''} onClick={()=>setTab('create')}>Criar salão</button><button className={tab==='join'?'active':''} onClick={()=>setTab('join')}>Tenho convite</button></div><form onSubmit={submit} className="formStack"><label>{tab==='create'?'Nome do salão':'Código do convite'}<input name="value" required placeholder={tab==='create'?'Ex.: Studio Maria':'Ex.: A4F91C2D'} /></label><button className="primary full" disabled={busy}>{tab==='create'?'Criar e continuar':'Entrar no salão'}</button></form></div></div>
 }
 
-function TodayView({appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus}:{appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void}){
+function TodayView({clients,appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus,onBookingSchedule}:{clients:Client[];appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onBookingSchedule:(request:BookingRequest)=>void}){
   return <><div className="dateStrip"><div><div className="muted cap">{dateLabel(todayISO()).split(',')[0]}</div><strong>{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date())}</strong></div><button className="primary small" onClick={onNew}>+ Marcação</button></div>
   <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Pedidos" value={bookingRequests.filter(r=>r.status==='new').length} sub="online"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/></div>
   <Section title={`Pedidos online (${bookingRequests.length})`}>
-    {bookingRequests.length?bookingRequests.map(r=><BookingRequestCard key={r.id} request={r} onStatus={onBookingStatus}/>):<Empty>Sem pedidos de marcação pendentes.</Empty>}
+    {bookingRequests.length?bookingRequests.map(r=>{const targetPhone=comparablePhone(r.phone);const linked=(r.client_id?clients.find(c=>c.id===r.client_id):undefined)||clients.find(c=>targetPhone&&comparablePhone(c.phone)===targetPhone);return <BookingRequestCard key={r.id} request={r} client={linked} onStatus={onBookingStatus} onSchedule={()=>onBookingSchedule(r)} onClient={()=>linked&&onClient(linked)}/> }):<Empty>Sem pedidos de marcação pendentes.</Empty>}
   </Section>
   <Section title={`Confirmar amanhã (${tomorrowAppointments.length})`}>
     {tomorrowAppointments.length?tomorrowAppointments.map(a=>{
@@ -397,17 +441,17 @@ function MoreView({membership,salon,manager,onWebsite,onServices,onAddStaff,onIn
 }
 
 function ModalLayer({modal,close,membership,members,services,clients,appointments,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void}){
-  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={onSaved} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}</div></div>
+  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} presetService={modal.presetService} presetDate={modal.presetDate} presetTime={modal.presetTime} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={async message=>{if(modal.bookingRequestId)await supabase.from('booking_requests').update({status:'booked',updated_at:new Date().toISOString()}).eq('id',modal.bookingRequestId);onSaved(message)}} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}</div></div>
 }
 
-function AppointmentForm({item,presetClient,membership,members,services,clients,appointments,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
+function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,membership,members,services,clients,appointments,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;presetService?:string;presetDate?:string;presetTime?:string;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
   const initialClientId=item?.client_id||presetClient||clients[0]?.id||''
   const initialClient=clients.find(c=>c.id===initialClientId)
   const [clientId,setClientId]=useState(initialClientId)
-  const [serviceId,setServiceId]=useState(item?.service_id||initialClient?.preferred_service_id||services[0]?.id||'')
+  const [serviceId,setServiceId]=useState(item?.service_id||presetService||initialClient?.preferred_service_id||services[0]?.id||'')
   const [employeeId,setEmployeeId]=useState(item?.employee_id||(manager?(initialClient?.preferred_employee_id||membership.id):membership.id))
-  const [date,setDate]=useState(item?localISODate(new Date(item.starts_at)):todayISO())
-  const [time,setTime]=useState(item?`${String(new Date(item.starts_at).getHours()).padStart(2,'0')}:${String(new Date(item.starts_at).getMinutes()).padStart(2,'0')}`:'09:00')
+  const [date,setDate]=useState(item?localISODate(new Date(item.starts_at)):(presetDate||todayISO()))
+  const [time,setTime]=useState(item?`${String(new Date(item.starts_at).getHours()).padStart(2,'0')}:${String(new Date(item.starts_at).getMinutes()).padStart(2,'0')}`:(presetTime||'09:00'))
   const [busy,setBusy]=useState(false)
 
   function changeClient(nextId:string){
@@ -963,11 +1007,11 @@ function startClientCreate(setModal:(m:Modal)=>void,showToast:(m:string)=>void){
   setModal({kind:'client'})
 }
 
-function BookingRequestCard({request,onStatus}:{request:BookingRequest;onStatus:(id:string,status:'contacted'|'booked'|'closed')=>void}){
+function BookingRequestCard({request,client,onStatus,onSchedule,onClient}:{request:BookingRequest;client?:Client;onStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onSchedule:()=>void;onClient:()=>void}){
   const date=new Intl.DateTimeFormat(locale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date(`${request.preferred_date}T12:00:00`))
   const period=request.preferred_period==='morning'?'Manhã':'Tarde'
   const text=`Olá ${firstName(request.name)}, recebemos o seu pedido de marcação para ${request.service_name} no dia ${date}, durante a ${period.toLowerCase()}. Vamos confirmar consigo a disponibilidade. Obrigado`
-  return <article className="card"><div className="cardRow"><span className="timeTag">{period}</span><div className="grow"><strong>{request.name}</strong><span>{request.service_name} · {date} · {request.phone}</span>{request.notes&&<small>{request.notes}</small>}<div className="miniActions"><button className="mini dark" onClick={()=>{whatsApp(request.phone,text);onStatus(request.id,'contacted')}}>WhatsApp</button><button className="mini" onClick={()=>{smsMessage(request.phone,text);onStatus(request.id,'contacted')}}>SMS</button><button className="mini" onClick={()=>onStatus(request.id,'closed')}>Fechar</button></div></div></div></article>
+  return <article className="card bookingRequestCard"><div className="cardRow"><span className="timeTag">{period}</span><div className="grow"><div className="bookingRequestTitle"><strong>{request.name}</strong><span className={`tag ${client?'ok':'warn'}`}>{client?'Cliente existente':'Novo cliente'}</span></div><span>{request.service_name} · {date} · {request.phone}</span>{request.notes&&<small>{request.notes}</small>}<div className="miniActions">{client&&<button className="mini" onClick={onClient}>Ficha</button>}<button className="mini primaryMini" onClick={onSchedule}>Criar marcação</button><button className="mini dark" onClick={()=>{whatsApp(request.phone,text);onStatus(request.id,'contacted')}}>WhatsApp</button><button className="mini" onClick={()=>{smsMessage(request.phone,text);onStatus(request.id,'contacted')}}>SMS</button><button className="mini" onClick={()=>onStatus(request.id,'closed')}>Fechar</button></div></div></div></article>
 }
 
 function BirthdayCard({client,date,daysUntil,onClient}:{client:Client;date:Date;daysUntil:number;onClient:()=>void}){
