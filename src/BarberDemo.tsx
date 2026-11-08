@@ -181,7 +181,7 @@ export default function BarberDemo(){
           <label>Telemóvel<input name="phone" type="tel" inputMode="tel" required placeholder="9xx xxx xxx"/></label>
           <label>Serviço<select required value={selectedService} onChange={e=>setSelectedService(e.target.value)}><option value="">Escolher serviço</option>{barberServices.map(s=><option key={s.name}>{s.name}</option>)}</select></label>
           <label>Dia preferencial<input type="date" min={todayForInput()} required/></label>
-          <label>Preferência<select required defaultValue=""><option value="" disabled>Escolher período</option><option>Manhã</option><option>Tarde</option></select></label>
+          <label>Preferência<select required defaultValue=""><option value="" disabled>Escolher período</option><option>Manhã</option><option>Tarde</option><option>Não tenho preferência</option></select></label>
           <button className="barberPrimary" type="submit">Enviar pedido</button>
           <small>Esta página é uma demonstração e não cria uma marcação real.</small>
         </form>}
