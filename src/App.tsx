@@ -14,7 +14,7 @@ type Client = { id:string; salon_id:string; name:string; phone:string|null; emai
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
 type Visit = { id:string; salon_id:string; client_id:string; appointment_id:string|null; employee_id:string; service_id:string|null; occurred_on:string; service_label:string|null; color_formula:string|null; treatment_products:string|null; notes:string|null; amount_paid:number }
 type Product = { id:string; salon_id:string; name:string; brand:string|null; barcode:string|null; unit:string; current_stock:number; min_stock:number; active:boolean }
-type BookingRequest = { id:string; salon_id:string; client_id:string|null; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
+type BookingRequest = { id:string; salon_id:string; client_id:string|null; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'|'no_preference'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
 type Salon = { id:string; name:string; timezone:string }
 
 type Modal =
@@ -217,7 +217,7 @@ export default function App(){
       presetClient:client.id,
       presetService:service?.id,
       presetDate:request.preferred_date,
-      presetTime:request.preferred_period==='morning'?'09:00':'14:00',
+      presetTime:request.preferred_period==='morning'?'09:00':request.preferred_period==='afternoon'?'14:00':undefined,
       bookingRequestId:request.id
     })
   }
@@ -1153,8 +1153,9 @@ function startClientCreate(setModal:(m:Modal)=>void,showToast:(m:string)=>void){
 
 function BookingRequestCard({request,client,onStatus,onSchedule,onClient}:{request:BookingRequest;client?:Client;onStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onSchedule:()=>void;onClient:()=>void}){
   const date=new Intl.DateTimeFormat(locale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date(`${request.preferred_date}T12:00:00`))
-  const period=request.preferred_period==='morning'?'Manhã':'Tarde'
-  const text=`Olá ${firstName(request.name)}, recebemos o seu pedido de marcação para ${request.service_name} no dia ${date}, durante a ${period.toLowerCase()}. Vamos confirmar consigo a disponibilidade. Obrigado`
+  const period=request.preferred_period==='morning'?'Manhã':request.preferred_period==='afternoon'?'Tarde':'Sem preferência'
+  const periodText=request.preferred_period==='no_preference'?'sem preferência de horário':`durante a ${period.toLowerCase()}`
+  const text=`Olá ${firstName(request.name)}, recebemos o seu pedido de marcação para ${request.service_name} no dia ${date}, ${periodText}. Vamos confirmar consigo a disponibilidade. Obrigado`
   return <article className="card bookingRequestCard"><div className="cardRow"><span className="timeTag">{period}</span><div className="grow"><div className="bookingRequestTitle"><strong>{request.name}</strong><span className={`tag ${client?'ok':'warn'}`}>{client?'Cliente existente':'Novo cliente'}</span></div><span>{request.service_name} · {date} · {request.phone}</span>{request.notes&&<small>{request.notes}</small>}<div className="miniActions">{client&&<button className="mini" onClick={onClient}>Ficha</button>}<button className="mini primaryMini" onClick={onSchedule}>Criar marcação</button><button className="mini dark" onClick={()=>{whatsApp(request.phone,text);onStatus(request.id,'contacted')}}>WhatsApp</button><button className="mini" onClick={()=>{smsMessage(request.phone,text);onStatus(request.id,'contacted')}}>SMS</button><button className="mini" onClick={()=>onStatus(request.id,'closed')}>Fechar</button></div></div></div></article>
 }
 
