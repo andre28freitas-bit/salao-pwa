@@ -83,3 +83,18 @@
   .barberSticky{display:block;position:fixed;left:0;right:0;bottom:0;z-index:100;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:rgba(250,249,245,.97);border-top:1px solid var(--b-line);backdrop-filter:blur(14px)}.barberSticky button{width:100%;min-height:52px;border:0;border-radius:7px;background:var(--b-black);color:#fff;font-weight:850;display:flex;align-items:center;justify-content:center;gap:9px}.barberSticky svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .barberModalBackdrop{align-items:end;padding:0}.barberModal{border-radius:18px 18px 0 0;padding:25px 20px calc(24px + env(safe-area-inset-bottom));max-height:93vh}
 }
+
+@media(max-width:900px){
+  .barberHeader{position:sticky}
+  .barberMenu{
+    position:absolute;
+    right:18px;
+    top:50%;
+    transform:translateY(-50%);
+    margin:0;
+    justify-self:auto;
+  }
+}
+@media(max-width:620px){
+  .barberMenu{right:16px}
+}
