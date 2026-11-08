@@ -1,0 +1,160 @@
+:root{
+  --site-cream:#f7f3ec;
+  --site-cream-2:#f1ece3;
+  --site-green:#244321;
+  --site-green-2:#355b31;
+  --site-gold:#b58a37;
+  --site-ink:#1e211c;
+  --site-muted:#6f7269;
+  --site-line:#ded8cd;
+}
+
+.salonSite{background:#fff;color:var(--site-ink);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.salonSite button,.salonSite a{font:inherit}
+.salonSite button{cursor:pointer}
+.siteHeader{
+  position:sticky;top:0;z-index:60;height:82px;
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:28px;
+  padding:0 clamp(22px,5vw,78px);background:rgba(255,255,255,.94);
+  border-bottom:1px solid rgba(222,216,205,.7);backdrop-filter:blur(16px)
+}
+.brandLockup{border:0;background:transparent;display:flex;align-items:center;gap:13px;padding:0;color:var(--site-ink);text-align:left}
+.brandMonogram{width:48px;height:48px;border:1px solid var(--site-gold);border-radius:50%;display:grid;place-items:center;color:var(--site-gold);font-family:Georgia,serif;font-size:18px;font-style:italic}
+.brandWords{display:grid;line-height:1}
+.brandWords strong{font-family:Georgia,serif;font-size:23px;font-style:italic;font-weight:500;color:var(--site-green)}
+.brandWords small{font-size:8px;letter-spacing:.26em;margin-top:7px}
+.siteNav{justify-self:center;display:flex;align-items:center;gap:28px}
+.siteNav button{border:0;background:transparent;color:var(--site-ink);padding:10px 0;font-size:14px}
+.siteNav .navLogin{color:var(--site-muted);font-size:12px}
+.headerCta,.sitePrimary{
+  border:0;background:var(--site-green);color:white;border-radius:999px;font-weight:750;
+  padding:13px 21px;box-shadow:none
+}
+.headerCta:hover,.sitePrimary:hover{background:var(--site-green-2)}
+.menuToggle{display:none;border:0;background:transparent;font-size:24px}
+
+.hero{min-height:560px;display:grid;grid-template-columns:minmax(320px,.86fr) minmax(0,1.14fr);background:var(--site-cream)}
+.heroCopy{display:flex;flex-direction:column;justify-content:center;padding:70px clamp(28px,6vw,96px)}
+.eyebrowGold{margin:0 0 14px;text-transform:uppercase;letter-spacing:.24em;font-size:11px;font-weight:850;color:var(--site-gold)}
+.hero h1,.siteSection h2,.qualityBand h2,.spaceSection h2,.resultsSection h2,.bookingBand h2{
+  font-family:Georgia,"Times New Roman",serif;font-weight:400;letter-spacing:-.025em
+}
+.hero h1{font-size:clamp(46px,5vw,76px);line-height:.98;margin:0;max-width:690px}
+.heroLead{font-size:17px;line-height:1.65;color:#4c5149;max-width:590px;margin:26px 0 30px}
+.heroActions{display:flex;gap:12px;flex-wrap:wrap}
+.siteSecondary{border:1px solid var(--site-green);background:transparent;color:var(--site-green);border-radius:999px;padding:12px 20px;font-weight:700}
+.heroVisual{min-height:560px;overflow:hidden}
+.heroVisual img{width:100%;height:100%;object-fit:cover;display:block}
+
+.trustStrip{display:grid;grid-template-columns:repeat(3,1fr);max-width:1220px;margin:0 auto;padding:32px clamp(20px,4vw,48px);gap:0;border-bottom:1px solid var(--site-line)}
+.trustStrip>div{padding:4px 34px;border-right:1px solid var(--site-line)}
+.trustStrip>div:first-child{padding-left:0}.trustStrip>div:last-child{border-right:0}
+.trustStrip span{font-family:Georgia,serif;color:var(--site-gold);font-size:13px;display:block;margin-bottom:7px}
+.trustStrip strong{display:block;font-size:14px;margin-bottom:5px}
+.trustStrip small{font-size:12px;color:var(--site-muted)}
+
+.siteSection,.resultsSection{padding:88px clamp(22px,6vw,96px)}
+.sectionIntro{max-width:760px;margin-bottom:38px}
+.sectionIntro h2{font-size:clamp(38px,4vw,58px);line-height:1.05;margin:0 0 15px}
+.sectionIntro>p:last-child{color:var(--site-muted);line-height:1.65;max-width:620px;margin:0}
+.serviceGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.serviceCard{border:1px solid var(--site-line);border-radius:18px;overflow:hidden;background:#fff}
+.serviceImage{aspect-ratio:4/3;overflow:hidden}
+.serviceImage img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.serviceCard:hover .serviceImage img{transform:scale(1.025)}
+.serviceBody{padding:19px}
+.serviceBody h3{font-family:Georgia,serif;font-size:25px;font-weight:500;margin:0 0 8px}
+.serviceBody p{font-size:13px;line-height:1.55;color:var(--site-muted);min-height:42px;margin:0 0 18px}
+.serviceBody button{width:100%;border:1px solid #9ba694;background:#fff;color:var(--site-green);border-radius:999px;padding:10px 12px;font-weight:750;font-size:12px}
+.serviceBody button:hover{background:var(--site-green);color:#fff}
+
+.qualityBand{background:var(--site-green);color:white;padding:80px clamp(22px,6vw,96px);display:grid;grid-template-columns:.95fr 1.05fr;gap:80px;align-items:start}
+.qualityBand .eyebrowGold{color:#d6b66f}
+.qualityBand h2{font-size:clamp(34px,3.6vw,54px);line-height:1.08;margin:0}
+.qualityPoints{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.qualityPoints strong{display:block;font-size:14px;margin-bottom:10px}
+.qualityPoints p{font-size:12px;line-height:1.65;color:rgba(255,255,255,.72);margin:0}
+
+.spaceSection{display:grid;grid-template-columns:1.12fr .88fr;min-height:560px;background:var(--site-cream)}
+.spaceVisual{overflow:hidden}
+.spaceVisual img{width:100%;height:100%;object-fit:cover;display:block}
+.spaceCopy{padding:70px clamp(30px,6vw,90px);display:flex;flex-direction:column;justify-content:center}
+.spaceCopy h2{font-size:clamp(38px,4vw,60px);line-height:1.02;margin:0 0 20px}
+.spaceCopy>p:not(.eyebrowGold){font-size:15px;line-height:1.7;color:var(--site-muted);max-width:550px;margin:0 0 24px}
+.siteTextLink{align-self:flex-start;border:0;background:transparent;color:var(--site-green);font-weight:800;padding:8px 0;border-bottom:1px solid #9aaa92}
+.siteTextLink span{margin-left:8px}
+
+.resultsSection{background:#fff}
+.sectionIntro.compact{margin-bottom:30px}
+.resultsGrid{display:grid;grid-template-columns:1.2fr .8fr 1fr;gap:14px;height:390px}
+.resultsGrid>div{overflow:hidden;border-radius:16px}
+.resultsGrid img{width:100%;height:100%;object-fit:cover;display:block}
+
+.bookingBand{margin:20px clamp(22px,5vw,72px) 0;padding:46px clamp(24px,4vw,52px);background:linear-gradient(110deg,#f1ece2,#f8f5ef);border:1px solid var(--site-line);border-radius:24px;display:flex;align-items:center;justify-content:space-between;gap:36px}
+.bookingBand h2{font-size:clamp(34px,4vw,56px);line-height:1.05;margin:0 0 10px}
+.bookingBand h2 em{font-weight:400;color:var(--site-green)}
+.bookingBand>div>p:last-child{color:var(--site-muted);font-size:14px;line-height:1.6;max-width:650px;margin:0}
+.bookingActions{display:flex;align-items:center;gap:18px;flex-shrink:0}
+.instagramLink{color:var(--site-green);text-decoration:none;font-weight:750;font-size:13px}
+
+.siteFooter{margin-top:70px;background:#f7f4ee;border-top:1px solid var(--site-line);padding:38px clamp(22px,6vw,90px);display:grid;grid-template-columns:1.2fr 1.1fr 1fr auto;gap:36px;align-items:start}
+.footerBrand{display:flex;gap:12px;align-items:center}
+.footerBrand>div{display:grid}.footerBrand strong{font-family:Georgia,serif;font-style:italic;color:var(--site-green);font-size:20px}.footerBrand small{font-size:9px;text-transform:uppercase;letter-spacing:.18em;margin-top:4px}
+.footerCopy strong,.footerSocial strong{font-size:12px;text-transform:uppercase;letter-spacing:.1em}
+.footerCopy p{font-size:11px;line-height:1.55;color:var(--site-muted);max-width:310px}
+.footerSocial a{display:block;margin-top:10px;color:var(--site-green);font-size:12px;text-decoration:none}
+.footerLogin{border:0;background:transparent;color:var(--site-muted);font-size:11px;text-decoration:underline;padding:0}
+
+@media(max-width:980px){
+  .siteHeader{height:72px;padding:0 20px;grid-template-columns:auto 1fr auto auto;gap:12px}
+  .brandWords{display:none}.brandMonogram{width:42px;height:42px}
+  .siteNav{display:none;position:absolute;top:72px;left:0;right:0;background:white;border-bottom:1px solid var(--site-line);padding:18px 22px;flex-direction:column;align-items:stretch;gap:0}
+  .siteNav.open{display:flex}
+  .siteNav button{text-align:left;padding:14px 0;border-bottom:1px solid #eee9e0}
+  .menuToggle{display:block}
+  .headerCta{padding:11px 15px;font-size:12px}
+  .hero{grid-template-columns:1fr;min-height:0}
+  .heroCopy{padding:58px 24px 40px}
+  .heroVisual{min-height:420px}
+  .trustStrip{grid-template-columns:1fr;gap:0;padding:18px 24px}
+  .trustStrip>div{border-right:0;border-bottom:1px solid var(--site-line);padding:16px 0}.trustStrip>div:last-child{border-bottom:0}
+  .serviceGrid{grid-template-columns:repeat(2,1fr)}
+  .qualityBand{grid-template-columns:1fr;gap:42px}
+  .spaceSection{grid-template-columns:1fr}.spaceVisual{height:440px}
+  .siteFooter{grid-template-columns:1fr 1fr}
+}
+
+@media(max-width:620px){
+  .headerCta{display:none}
+  .siteHeader{grid-template-columns:auto 1fr auto}
+  .brandWords{display:grid}.brandWords strong{font-size:18px}.brandWords small{font-size:6px}
+  .heroCopy{padding:44px 20px 32px}
+  .hero h1{font-size:43px}
+  .heroLead{font-size:15px;margin:20px 0 24px}
+  .heroActions{display:grid;grid-template-columns:1fr}.heroActions button{width:100%}
+  .heroVisual{min-height:310px}
+  .siteSection,.resultsSection{padding:62px 18px}
+  .sectionIntro h2{font-size:38px}
+  .serviceGrid{grid-template-columns:1fr;gap:12px}
+  .serviceCard{display:grid;grid-template-columns:42% 58%;border-radius:14px}
+  .serviceImage{aspect-ratio:auto;min-height:168px}
+  .serviceBody{padding:15px 14px}
+  .serviceBody h3{font-size:22px}
+  .serviceBody p{font-size:12px;min-height:0;margin-bottom:14px}
+  .serviceBody button{font-size:11px;padding:9px 8px}
+  .qualityBand{padding:58px 20px}
+  .qualityBand h2{font-size:37px}
+  .qualityPoints{grid-template-columns:1fr;gap:0}
+  .qualityPoints>div{padding:18px 0;border-bottom:1px solid rgba(255,255,255,.15)}.qualityPoints>div:last-child{border-bottom:0}
+  .spaceVisual{height:300px}.spaceCopy{padding:48px 20px}
+  .spaceCopy h2{font-size:38px}
+  .resultsGrid{grid-template-columns:1.3fr .7fr;height:320px}.resultsGrid>div:last-child{display:none}
+  .bookingBand{margin:10px 14px 0;padding:34px 20px;border-radius:18px;display:block}
+  .bookingBand h2{font-size:37px}
+  .bookingActions{margin-top:24px;justify-content:space-between}
+  .siteFooter{margin-top:50px;padding:30px 20px;grid-template-columns:1fr;gap:22px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .salonSite *{scroll-behavior:auto!important;transition:none!important}
+}
