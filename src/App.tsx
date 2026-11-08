@@ -13,6 +13,7 @@ type Client = { id:string; salon_id:string; name:string; phone:string|null; emai
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
 type Visit = { id:string; salon_id:string; client_id:string; appointment_id:string|null; employee_id:string; service_id:string|null; occurred_on:string; service_label:string|null; color_formula:string|null; treatment_products:string|null; notes:string|null; amount_paid:number }
 type Product = { id:string; salon_id:string; name:string; brand:string|null; barcode:string|null; unit:string; current_stock:number; min_stock:number; active:boolean }
+type BookingRequest = { id:string; salon_id:string; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
 type Salon = { id:string; name:string; timezone:string }
 
 type Modal =
@@ -87,6 +88,7 @@ export default function App(){
   const [appointments,setAppointments]=useState<Appointment[]>([])
   const [visits,setVisits]=useState<Visit[]>([])
   const [products,setProducts]=useState<Product[]>([])
+  const [bookingRequests,setBookingRequests]=useState<BookingRequest[]>([])
   const [view,setView]=useState<View>('today')
   const [agendaDate,setAgendaDate]=useState(todayISO())
   const [agendaMode,setAgendaMode]=useState<'mine'|'team'>('mine')
@@ -128,17 +130,18 @@ export default function App(){
   async function loadData(){
     if(!membership) return
     const salonId=membership.salon_id
-    const [m,s,c,a,v,p]=await Promise.all([
+    const [m,s,c,a,v,p,br]=await Promise.all([
       supabase.from('salon_members').select('*').eq('salon_id',salonId).eq('active',true).order('display_name'),
       supabase.from('services').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
       supabase.from('clients').select('*').eq('salon_id',salonId).order('name'),
       supabase.from('appointments').select('*').eq('salon_id',salonId).order('starts_at'),
       supabase.from('visits').select('*').eq('salon_id',salonId).order('occurred_on',{ascending:false}),
-      supabase.from('products').select('*').eq('salon_id',salonId).eq('active',true).order('name')
+      supabase.from('products').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
+      supabase.from('booking_requests').select('*').eq('salon_id',salonId).in('status',['new','contacted']).order('created_at',{ascending:false})
     ])
-    for(const result of [m,s,c,a,v,p]) if(result.error) showToast(result.error.message)
+    for(const result of [m,s,c,a,v,p,br]) if(result.error) showToast(result.error.message)
     setMembers((m.data||[]) as Member[]); setServices((s.data||[]) as Service[]); setClients((c.data||[]) as Client[])
-    setAppointments((a.data||[]) as Appointment[]); setVisits((v.data||[]) as Visit[]); setProducts((p.data||[]) as Product[])
+    setAppointments((a.data||[]) as Appointment[]); setVisits((v.data||[]) as Visit[]); setProducts((p.data||[]) as Product[]); setBookingRequests((br.data||[]) as BookingRequest[])
   }
 
   function subscribeRealtime(){
@@ -148,11 +151,16 @@ export default function App(){
       .on('postgres_changes',{event:'*',schema:'public',table:'clients',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'visits',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'products',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
+      .on('postgres_changes',{event:'*',schema:'public',table:'booking_requests',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .subscribe()
     return ()=>{supabase.removeChannel(channel)}
   }
 
   function showToast(message:string){ setToast(message); window.setTimeout(()=>setToast(''),2600) }
+  async function updateBookingRequestStatus(id:string,status:'contacted'|'booked'|'closed'){
+    const {error}=await supabase.from('booking_requests').update({status,updated_at:new Date().toISOString()}).eq('id',id)
+    if(error) showToast(error.message); else { showToast('Pedido atualizado.'); await loadData() }
+  }
   const clientBy=(id:string)=>clients.find(x=>x.id===id)
   const serviceBy=(id:string|null)=>services.find(x=>x.id===id)
   const memberBy=(id:string)=>members.find(x=>x.id===id)
@@ -196,7 +204,7 @@ export default function App(){
     </header>
 
     <main className="content">
-      {view==='today' && <TodayView appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
+      {view==='today' && <TodayView appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} />}
       {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
@@ -259,9 +267,12 @@ function Onboarding({onDone,onToast}:{onDone:()=>void;onToast:(m:string)=>void})
   return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><h1>Primeira configuração</h1><div className="segmented"><button className={tab==='create'?'active':''} onClick={()=>setTab('create')}>Criar salão</button><button className={tab==='join'?'active':''} onClick={()=>setTab('join')}>Tenho convite</button></div><form onSubmit={submit} className="formStack"><label>{tab==='create'?'Nome do salão':'Código do convite'}<input name="value" required placeholder={tab==='create'?'Ex.: Studio Maria':'Ex.: A4F91C2D'} /></label><button className="primary full" disabled={busy}>{tab==='create'?'Criar e continuar':'Entrar no salão'}</button></form></div></div>
 }
 
-function TodayView({appointments,tomorrowAppointments,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook}:{appointments:Appointment[];tomorrowAppointments:Appointment[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void}){
+function TodayView({appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus}:{appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void}){
   return <><div className="dateStrip"><div><div className="muted cap">{dateLabel(todayISO()).split(',')[0]}</div><strong>{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date())}</strong></div><button className="primary small" onClick={onNew}>+ Marcação</button></div>
-  <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/><Kpi label="Aniversários" value={upcomingBirthdays.length} sub="7 dias"/></div>
+  <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Pedidos" value={bookingRequests.filter(r=>r.status==='new').length} sub="online"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/></div>
+  <Section title={`Pedidos online (${bookingRequests.length})`}>
+    {bookingRequests.length?bookingRequests.map(r=><BookingRequestCard key={r.id} request={r} onStatus={onBookingStatus}/>):<Empty>Sem pedidos de marcação pendentes.</Empty>}
+  </Section>
   <Section title={`Confirmar amanhã (${tomorrowAppointments.length})`}>
     {tomorrowAppointments.length?tomorrowAppointments.map(a=>{
       const client=clientBy(a.client_id), service=serviceBy(a.service_id), member=memberBy(a.employee_id)
@@ -950,6 +961,13 @@ function startClientCreate(setModal:(m:Modal)=>void,showToast:(m:string)=>void){
     if(useImport){ contacts.select(['name','tel'],{multiple:false}).then((rows:any[])=>{if(!rows?.length)return;const row=rows[0];setModal({kind:'client',prefill:{name:Array.isArray(row.name)?row.name[0]:row.name,phone:Array.isArray(row.tel)?row.tel[0]:row.tel}})}).catch(()=>showToast('Não foi possível importar o contacto.')); return }
   }
   setModal({kind:'client'})
+}
+
+function BookingRequestCard({request,onStatus}:{request:BookingRequest;onStatus:(id:string,status:'contacted'|'booked'|'closed')=>void}){
+  const date=new Intl.DateTimeFormat(locale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date(`${request.preferred_date}T12:00:00`))
+  const period=request.preferred_period==='morning'?'Manhã':'Tarde'
+  const text=`Olá ${firstName(request.name)}, recebemos o seu pedido de marcação para ${request.service_name} no dia ${date}, durante a ${period.toLowerCase()}. Vamos confirmar consigo a disponibilidade. Obrigado`
+  return <article className="card"><div className="cardRow"><span className="timeTag">{period}</span><div className="grow"><strong>{request.name}</strong><span>{request.service_name} · {date} · {request.phone}</span>{request.notes&&<small>{request.notes}</small>}<div className="miniActions"><button className="mini dark" onClick={()=>{whatsApp(request.phone,text);onStatus(request.id,'contacted')}}>WhatsApp</button><button className="mini" onClick={()=>{smsMessage(request.phone,text);onStatus(request.id,'contacted')}}>SMS</button><button className="mini" onClick={()=>onStatus(request.id,'closed')}>Fechar</button></div></div></div></article>
 }
 
 function BirthdayCard({client,date,daysUntil,onClient}:{client:Client;date:Date;daysUntil:number;onClient:()=>void}){
