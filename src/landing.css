@@ -352,3 +352,16 @@
     flex:0 0 auto;
   }
 }
+
+.footerContactLink{
+  display:block;
+  margin-top:10px;
+  color:var(--site-green);
+  text-decoration:none;
+  font-size:13px;
+  font-weight:750;
+}
+.footerAddress{
+  margin:7px 0 0!important;
+  white-space:pre-line;
+}
