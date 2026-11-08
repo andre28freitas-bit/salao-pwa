@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { FormEvent, useState } from 'react'
+import { supabase } from './lib/supabase'
 
 type LandingPageProps = {
   onLogin: () => void
 }
 
+const SALON_ID = 'c390b52f-ede9-44bc-a657-348df30110a0'
 const salonImage = 'https://images.unsplash.com/photo-1706629506571-a6d86798916b?auto=format&fit=crop&w=1800&q=80'
 const spaceImage = 'https://images.unsplash.com/photo-1706629505300-168aa1604912?auto=format&fit=crop&w=1400&q=78'
 
@@ -30,9 +32,17 @@ const services = [
   }
 ]
 
+function todayForInput(){
+  const d=new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 export default function LandingPage({ onLogin }: LandingPageProps){
   const [menuOpen,setMenuOpen]=useState(false)
+  const [bookingOpen,setBookingOpen]=useState(false)
   const [selectedService,setSelectedService]=useState('')
+  const [bookingBusy,setBookingBusy]=useState(false)
+  const [bookingSuccess,setBookingSuccess]=useState(false)
 
   function scrollTo(id:string){
     setMenuOpen(false)
@@ -41,7 +51,30 @@ export default function LandingPage({ onLogin }: LandingPageProps){
 
   function book(service?:string){
     setSelectedService(service||'')
-    window.setTimeout(()=>document.getElementById('marcar')?.scrollIntoView({behavior:'smooth',block:'center'}),20)
+    setBookingSuccess(false)
+    setBookingOpen(true)
+  }
+
+  async function submitBooking(e:FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    setBookingBusy(true)
+    const fd=new FormData(e.currentTarget)
+    const payload={
+      salon_id:SALON_ID,
+      name:String(fd.get('name')||'').trim(),
+      phone:String(fd.get('phone')||'').trim(),
+      service_name:String(fd.get('service_name')||'').trim(),
+      preferred_date:String(fd.get('preferred_date')||''),
+      preferred_period:String(fd.get('preferred_period')||''),
+      notes:String(fd.get('notes')||'').trim()||null
+    }
+    const {error}=await supabase.from('booking_requests').insert(payload)
+    setBookingBusy(false)
+    if(error){
+      alert('Não foi possível enviar o pedido. Tente novamente.')
+      return
+    }
+    setBookingSuccess(true)
   }
 
   return <div className="salonSite">
@@ -141,11 +174,11 @@ export default function LandingPage({ onLogin }: LandingPageProps){
       <section className="bookingBand" id="marcar">
         <div>
           <p className="eyebrowGold">Marcação</p>
-          <h2>{selectedService?<>Quer marcar <em>{selectedService}</em>?</>:<>Pronta para cuidar do seu cabelo?</>}</h2>
-          <p>Escolha o serviço e fale connosco. Ligamos esta área à marcação online assim que definirmos o canal final do salão.</p>
+          <h2>Pronta para cuidar do seu cabelo?</h2>
+          <p>Diga-nos o serviço, o dia e se prefere manhã ou tarde. Entramos em contacto para confirmar a hora.</p>
         </div>
         <div className="bookingActions">
-          <button className="sitePrimary" onClick={()=>scrollTo('contactos')}>Quero agendar</button>
+          <button className="sitePrimary" onClick={()=>book()}>Pedir marcação</button>
           <a className="instagramLink" href="https://www.instagram.com/deboracruzcabeleireiros/" target="_blank" rel="noreferrer">Instagram ↗</a>
         </div>
       </section>
@@ -166,5 +199,53 @@ export default function LandingPage({ onLogin }: LandingPageProps){
       </div>
       <button className="footerLogin" onClick={onLogin}>Área reservada</button>
     </footer>
+
+    {bookingOpen&&<div className="bookingModalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setBookingOpen(false)}}>
+      <div className="bookingModal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
+        <div className="bookingModalHead">
+          <div><p className="eyebrowGold">Marcação</p><h2 id="booking-title">Pedir marcação</h2></div>
+          <button className="bookingClose" onClick={()=>setBookingOpen(false)} aria-label="Fechar">×</button>
+        </div>
+
+        {bookingSuccess?<div className="bookingSuccess">
+          <span>✓</span>
+          <h3>Pedido enviado</h3>
+          <p>Recebemos o seu pedido. O salão entrará em contacto para confirmar o horário.</p>
+          <button className="sitePrimary" onClick={()=>setBookingOpen(false)}>Fechar</button>
+        </div>:<form className="bookingForm" onSubmit={submitBooking}>
+          <label>Nome
+            <input name="name" required autoComplete="name" placeholder="O seu nome"/>
+          </label>
+          <label>Telemóvel
+            <input name="phone" required type="tel" inputMode="tel" autoComplete="tel" placeholder="9xx xxx xxx"/>
+          </label>
+          <label>Serviço
+            <select name="service_name" required value={selectedService} onChange={e=>setSelectedService(e.target.value)}>
+              <option value="">Escolha um serviço</option>
+              {services.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
+              <option value="Outro">Outro</option>
+            </select>
+          </label>
+          <label>Dia preferencial
+            <input name="preferred_date" required type="date" min={todayForInput()}/>
+          </label>
+
+          <fieldset className="periodField">
+            <legend>Horário preferencial</legend>
+            <div className="periodChoice">
+              <label><input type="radio" name="preferred_period" value="morning" required/><span>Manhã</span></label>
+              <label><input type="radio" name="preferred_period" value="afternoon" required/><span>Tarde</span></label>
+            </div>
+          </fieldset>
+
+          <label>Nota <small>opcional</small>
+            <textarea name="notes" placeholder="Alguma preferência ou informação importante?"/>
+          </label>
+
+          <button className="sitePrimary bookingSubmit" disabled={bookingBusy}>{bookingBusy?'A enviar…':'Enviar pedido'}</button>
+          <p className="bookingFinePrint">Este pedido não confirma automaticamente a marcação. O salão entrará em contacto para confirmar a disponibilidade.</p>
+        </form>}
+      </div>
+    </div>}
   </div>
 }
