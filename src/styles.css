@@ -326,3 +326,8 @@
   .monthDay{border-radius:8px}
   .monthDayNumber{font-size:11px}
 }
+
+/* Booking request matching */
+.bookingRequestTitle{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bookingRequestTitle .tag{font-size:10px}
+.primaryMini{background:var(--ink)!important;color:white!important;border-color:var(--ink)!important}
