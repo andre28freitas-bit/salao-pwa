@@ -23,6 +23,8 @@ type Modal =
   | { kind:'scanner' }
   | { kind:'invite' }
   | { kind:'staff' }
+  | { kind:'services' }
+  | { kind:'service'; item?:Service }
   | null
 
 const locale = 'pt-PT'
@@ -194,7 +196,7 @@ export default function App(){
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
-      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
+      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
     </main>
 
     <nav className="bottomNav">
@@ -287,15 +289,15 @@ function StockView({products,query,setQuery,onScan,onNew,onEdit,onChange}:{produ
   return <><div className="stockActions"><button className="primary" onClick={onScan}>▣ Scan código</button><button className="secondary" onClick={onNew}>+ Produto</button></div><div className="searchRow"><input type="search" placeholder="Produto, marca ou código…" value={query} onChange={e=>setQuery(e.target.value)} /></div><div className="stack">{arr.map(p=><ProductCard key={p.id} p={p} actions={<><button className="mini" onClick={()=>onChange(p,-1)}>−1</button><button className="mini" onClick={()=>onChange(p,1)}>+1</button><button className="mini" onClick={()=>onEdit(p)}>Editar</button></>} />)}</div></>
 }
 
-function MoreView({membership,salon,manager,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
-  return <div className="stack"><div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>{manager&&<button className="menuCard" onClick={onAddStaff}><span>✂️</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}{manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador com acesso</strong><small>Envia um convite por email para usar a aplicação.</small></div><b>›</b></button>}<button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button></div>
+function MoreView({membership,salon,manager,onServices,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onServices:()=>void;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
+  return <div className="stack"><div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>{manager&&<button className="menuCard" onClick={onServices}><span>✂︎</span><div><strong>Serviços</strong><small>Preços, duração e recorrência dos serviços do salão.</small></div><b>›</b></button>}{manager&&<button className="menuCard" onClick={onAddStaff}><span>👤</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}{manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador com acesso</strong><small>Envia um convite por email para usar a aplicação.</small></div><b>›</b></button>}<button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button></div>
 }
 
 function ModalLayer({modal,close,membership,members,services,clients,appointments,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void}){
-  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} membership={membership} members={members} services={services} clients={clients} manager={manager} onSaved={onSaved} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}</div></div>
+  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={onSaved} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}</div></div>
 }
 
-function AppointmentForm({item,presetClient,membership,members,services,clients,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;membership:Member;members:Member[];services:Service[];clients:Client[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
+function AppointmentForm({item,presetClient,membership,members,services,clients,appointments,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
   const initialClientId=item?.client_id||presetClient||clients[0]?.id||''
   const initialClient=clients.find(c=>c.id===initialClientId)
   const [clientId,setClientId]=useState(initialClientId)
@@ -319,7 +321,20 @@ function AppointmentForm({item,presetClient,membership,members,services,clients,
     const service=services.find(x=>x.id===serviceId)
     const start=new Date(`${date}T${time}:00`)
     const end=new Date(start.getTime()+Number(service?.duration_minutes||45)*60000)
-    const payload={salon_id:membership.salon_id,client_id:clientId,service_id:serviceId||null,employee_id:manager?employeeId:membership.id,starts_at:start.toISOString(),ends_at:end.toISOString(),status:String(fd.get('status')||'pending'),notes:String(fd.get('notes')||'')||null}
+    const targetEmployee=manager?employeeId:membership.id
+    const conflict=appointments.find(a=>
+      a.id!==item?.id &&
+      a.employee_id===targetEmployee &&
+      a.status!=='cancelled' &&
+      new Date(a.starts_at).getTime()<end.getTime() &&
+      new Date(a.ends_at).getTime()>start.getTime()
+    )
+    if(conflict){
+      setBusy(false)
+      const conflictClient=clients.find(c=>c.id===conflict.client_id)
+      return alert(`Este profissional já tem uma marcação entre ${hhmm(conflict.starts_at)} e ${hhmm(conflict.ends_at)}${conflictClient?` (${conflictClient.name})`:''}.`)
+    }
+    const payload={salon_id:membership.salon_id,client_id:clientId,service_id:serviceId||null,employee_id:targetEmployee,starts_at:start.toISOString(),ends_at:end.toISOString(),status:String(fd.get('status')||'pending'),notes:String(fd.get('notes')||'')||null}
     const q=item?supabase.from('appointments').update(payload).eq('id',item.id):supabase.from('appointments').insert(payload)
     const {error}=await q;setBusy(false)
     if(error)alert(error.message);else onSaved(item?'Marcação atualizada.':'Marcação criada.')
@@ -327,13 +342,67 @@ function AppointmentForm({item,presetClient,membership,members,services,clients,
 
   return <form className="formStack appointmentForm" onSubmit={submit}>
     <label>Cliente<select name="client_id" value={clientId} onChange={e=>changeClient(e.target.value)}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-    <label>Serviço<select value={serviceId} onChange={e=>setServiceId(e.target.value)}>{services.map(s=><option key={s.id} value={s.id}>{s.name} · {s.duration_minutes} min</option>)}</select></label>
+    <label>Serviço<select value={serviceId} onChange={e=>setServiceId(e.target.value)}>{services.map(s=><option key={s.id} value={s.id}>{s.name} · {s.duration_minutes} min · {money(s.price)}</option>)}</select></label>
     {manager&&<label>Profissional<select name="employee_id" value={employeeId} onChange={e=>setEmployeeId(e.target.value)}>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select></label>}
     <div className="grid2 appointmentDateTime"><label>Data<input type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label><label>Hora<input type="time" value={time} onChange={e=>setTime(e.target.value)} required/></label></div>
     {item&&<label>Estado<select name="status" defaultValue={item.status}><option value="pending">Pendente</option><option value="confirmed">Confirmada</option><option value="completed">Concluída</option><option value="no_show">Faltou</option></select></label>}
     <label>Observações <span className="optionalLabel">opcional</span><textarea name="notes" defaultValue={item?.notes||''} placeholder="Ex.: preferência, atraso, detalhe importante…"/></label>
     <button className="primary full appointmentSave" disabled={busy}>{busy?'A guardar…':item?'Guardar alterações':'Guardar marcação'}</button>
     {item&&<div className="modalBottomActions"><button type="button" className="secondary" onClick={()=>onVisit(item)}>Concluir + histórico</button><button type="button" className="dangerButton" onClick={()=>onDelete(item)}>Cancelar marcação</button></div>}
+  </form>
+}
+
+
+function ServicesManager({services,onNew,onEdit}:{services:Service[];onNew:()=>void;onEdit:(service:Service)=>void}){
+  return <div className="stack serviceManager">
+    <button className="primary full" onClick={onNew}>+ Adicionar serviço</button>
+    {services.length?services.map(service=><button key={service.id} className="serviceRow" onClick={()=>onEdit(service)}>
+      <div><strong>{service.name}</strong><span>{service.duration_minutes} min{service.recurrence_weeks?` · habitual ${service.recurrence_weeks} sem.`:''}</span></div>
+      <div className="servicePrice">{money(service.price)} <b>›</b></div>
+    </button>):<Empty>Ainda não tens serviços criados.</Empty>}
+  </div>
+}
+
+function ServiceForm({item,membership,onSaved}:{item?:Service;membership:Member;onSaved:(m:string)=>void}){
+  const [busy,setBusy]=useState(false)
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault();setBusy(true)
+    const fd=new FormData(e.currentTarget)
+    const payload={
+      salon_id:membership.salon_id,
+      name:String(fd.get('name')||'').trim(),
+      duration_minutes:Number(fd.get('duration_minutes')||45),
+      price:Number(fd.get('price')||0),
+      recurrence_weeks:Number(fd.get('recurrence_weeks')||0)||null,
+      active:true
+    }
+    if(!payload.name){setBusy(false);return alert('Indica o nome do serviço.')}
+    const q=item?supabase.from('services').update(payload).eq('id',item.id):supabase.from('services').insert(payload)
+    const {error}=await q;setBusy(false)
+    if(error)return alert(error.message)
+    onSaved(item?'Serviço atualizado.':'Serviço criado.')
+  }
+  async function archive(){
+    if(!item || !window.confirm(`Desativar "${item.name}"? As marcações antigas mantêm-se.`)) return
+    setBusy(true)
+    const {error}=await supabase.from('services').update({active:false}).eq('id',item.id)
+    setBusy(false)
+    if(error)return alert(error.message)
+    onSaved('Serviço desativado.')
+  }
+  return <form className="formStack serviceForm" onSubmit={submit}>
+    <section className="formSection">
+      <div className="formSectionHead"><div><strong>Serviço</strong><span>Informação usada nas marcações</span></div></div>
+      <label>Nome<input name="name" required autoFocus defaultValue={item?.name||''} placeholder="Ex.: Corte"/></label>
+      <div className="serviceFormGrid">
+        <label>Preço (€)<input name="price" type="number" inputMode="decimal" min="0" step="0.01" defaultValue={item?.price||0}/></label>
+        <label>Duração<input name="duration_minutes" type="number" inputMode="numeric" min="5" step="5" defaultValue={item?.duration_minutes||45}/><small className="muted">minutos</small></label>
+      </div>
+      <label>Recorrência habitual <span className="optionalLabel">opcional</span><div className="inlineUnit"><input name="recurrence_weeks" type="number" inputMode="numeric" min="1" max="52" defaultValue={item?.recurrence_weeks||''} placeholder="Ex.: 5"/><span>semanas</span></div></label>
+      <p className="formHint">Ao selecionar este serviço numa marcação, a agenda reserva automaticamente esta duração para o profissional.</p>
+    </section>
+    <div className="stickyFormAction"><button className="primary full" disabled={busy}>{busy?'A guardar…':item?'Guardar alterações':'Criar serviço'}</button></div>
+    {item&&<button type="button" className="dangerButton full" disabled={busy} onClick={()=>void archive()}>Desativar serviço</button>}
   </form>
 }
 
@@ -810,7 +879,7 @@ function Section({title,children}:{title:string;children:ReactNode}){return <sec
 function Empty({children}:{children:ReactNode}){return <div className="empty">{children}</div>}
 function InfoCard({label,children}:{label:string;children:ReactNode}){return <div className="infoCard"><span>{label}</span><strong>{children}</strong></div>}
 
-function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':'Convidar colaborador'}
+function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):'Convidar colaborador'}
 function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Conta'} as const)[v]}
 function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Mais'} as const)[v]}
 function navIcon(v:View){return ({today:'⌂',agenda:'□',clients:'♙',alerts:'!',stock:'▤',more:'•••'} as const)[v]}
