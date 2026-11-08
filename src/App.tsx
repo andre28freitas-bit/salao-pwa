@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { isConfigured, supabase } from './lib/supabase'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { createWorker } from 'tesseract.js'
+import LandingPage from './LandingPage'
 
 type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
@@ -184,7 +185,7 @@ export default function App(){
   if(loading) return <div className="splash"><div className="brandMark">S</div><p>A carregar…</p></div>
   if(!isConfigured) return <SetupScreen />
   if(session && (passwordRecovery || session.user.user_metadata?.needs_password===true)) return <PasswordResetScreen inviteSetup={session.user.user_metadata?.needs_password===true} onDone={()=>{ setPasswordRecovery(false); const u=new URL(window.location.href); u.searchParams.delete('reset'); window.history.replaceState({},'',u.pathname+u.search+u.hash) }} onToast={showToast} />
-  if(!session) return <AuthScreen onToast={showToast} />
+  if(!session){ const loginRequested=new URLSearchParams(window.location.search).get('login')==='1'; return loginRequested?<AuthScreen onToast={showToast} />:<LandingPage onLogin={()=>{ window.location.href='/?login=1' }} /> }
   if(!membership) return <Onboarding onDone={loadMembership} onToast={showToast} />
 
   return <div className="appShell">
