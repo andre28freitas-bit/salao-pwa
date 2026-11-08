@@ -70,3 +70,60 @@
   .modalHead .iconButton{width:40px;height:40px;flex:0 0 40px}
   .appointmentForm{padding-bottom:2px}
 }
+
+/* Client editor: mobile-first card-based form */
+.clientEditForm{gap:10px;padding-bottom:2px}
+.formSection{
+  background:#fbfaf8;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:13px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.formSectionHead{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1px}
+.formSectionHead strong{display:block;font-size:14px;color:var(--ink)}
+.formSectionHead span{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-top:2px}
+.clientEditForm label{font-size:12px}
+.clientEditForm input,.clientEditForm select{
+  min-height:44px;
+  padding:9px 11px;
+}
+.clientEditForm textarea{
+  min-height:72px;
+  padding:10px 11px;
+}
+.clientEditForm .nameField input{font-size:16px;font-weight:650}
+.clientContactFields,.preferenceFields{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+.formHint{
+  margin:0;
+  padding:0 2px;
+  font-size:11px;
+  line-height:1.35;
+  color:var(--muted);
+}
+.srOnlyLabel{font-size:0!important}
+.srOnlyLabel textarea{font-size:14px!important;margin-top:0!important}
+.stickyFormAction{
+  position:sticky;
+  bottom:-14px;
+  z-index:7;
+  padding:10px 0 max(2px,env(safe-area-inset-bottom));
+  background:linear-gradient(to bottom,rgba(255,255,255,0),white 22%,white 100%);
+}
+.stickyFormAction .primary{min-height:50px;font-size:16px}
+@media (min-width:560px){
+  .clientContactFields{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+  .preferenceFields{grid-template-columns:minmax(0,1.4fr) minmax(130px,.6fr)}
+}
+@media (max-width:520px){
+  .clientEditForm{gap:8px}
+  .formSection{padding:12px;border-radius:16px;gap:9px}
+  .modalCard:has(.clientEditForm){padding-left:12px;padding-right:12px}
+  .modalCard:has(.clientEditForm) .modalHead{padding-left:2px;padding-right:2px}
+}
