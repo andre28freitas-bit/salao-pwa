@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
 
-type Member={id:string;salon_id:string;display_name:string;role:string;active:boolean}
+type Member={id:string;salon_id:string;display_name:string;role:string;active:boolean;calendar_color:string}
 type Client={id:string;salon_id:string;name:string;phone:string|null;preferred_service_id:string|null;dormant_after_weeks?:number|null}
 type Service={id:string;name:string;price:number}
 type Appointment={id:string;client_id:string;employee_id:string;starts_at:string;status:string}
@@ -24,6 +24,7 @@ type Sale={id:string;client_id:string|null;employee_id:string;occurred_at:string
 type Goal={id:string;goal_type:'revenue'|'services'|'appointments';title:string|null;target_value:number;period_start:string;period_end:string;active:boolean}
 
 const weekdays=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+const memberColorPresets=['#6F8FAF','#C98686','#7FA37F','#B08AA8','#C49A63','#6F9E9A','#8D84B8','#B7856A']
 const euro=(n:number)=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(n||0))
 const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 const weeksSince=(iso:string)=>Math.max(0,Math.floor((Date.now()-new Date(`${iso}T12:00:00`).getTime())/(7*86400000)))
@@ -100,7 +101,7 @@ export default function BusinessHub({
     {saved&&<div className="businessSaved">{saved}</div>}
     {tab==='dashboard'&&<Dashboard clients={clients} appointments={appointments} visits={visits} sales={sales} settings={settings} goals={goals}/>}
     {tab==='booking'&&<BookingSettings settings={settings} setSettings={setSettings} onSaved={async()=>{flash('Configuração guardada.');await onChanged()}}/>}
-    {tab==='team'&&<TeamSchedule membership={membership} members={members} selectedMember={selectedMember} setSelectedMember={setSelectedMember} periods={periods} blocks={blocks} reload={async()=>{await load();flash('Horário atualizado.')}}/>}
+    {tab==='team'&&<TeamSchedule membership={membership} members={members} selectedMember={selectedMember} setSelectedMember={setSelectedMember} periods={periods} blocks={blocks} reload={async()=>{await load();await onChanged();flash('Equipa atualizada.')}}/>}
     {tab==='dormant'&&<DormantClients clients={clients} services={services} visits={visits} settings={settings} onSettings={async next=>{setSettings(next);await onChanged();flash('Prazo atualizado.')}}/>}
     {tab==='loyalty'&&<Loyalty membership={membership} clients={clients} visits={visits} settings={settings} setSettings={setSettings} redemptions={redemptions} reload={async()=>{await load();await onChanged();flash('Fidelização atualizada.')}}/>}
     {tab==='sales'&&<Sales membership={membership} members={members} clients={clients} settings={settings} sales={sales} reload={async()=>{await load();await onChanged();flash('Venda registada.')}}/>}
@@ -251,10 +252,24 @@ function TeamSchedule({membership,members,selectedMember,setSelectedMember,perio
     await reload()
   }
   async function removeBlock(id:string){const {error}=await supabase.from('member_schedule_blocks').delete().eq('id',id);if(error)return alert(error.message);await reload()}
+  async function saveColor(color:string){
+    if(!selectedMember)return
+    const {error}=await supabase.from('salon_members').update({calendar_color:color,updated_at:new Date().toISOString()}).eq('id',selectedMember)
+    if(error)return alert(error.message)
+    await reload()
+  }
+  const selectedMemberData=members.find(m=>m.id===selectedMember)
 
   return <div className="businessPanel teamSchedulePanel">
     <div className="businessIntro"><div><span>Equipa</span><h3>Horário e disponibilidade</h3></div><small>Usa vários períodos para almoço ou pausas recorrentes. Usa bloqueios para exceções.</small></div>
     <label>Profissional<select value={selectedMember} onChange={e=>setSelectedMember(e.target.value)}>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select></label>
+    <div className="memberColorSetting">
+      <div><strong>Cor na agenda</strong><span>Ajuda a distinguir rapidamente cada profissional.</span></div>
+      <div className="memberColorChoices">
+        {memberColorPresets.map(color=><button key={color} type="button" className={selectedMemberData?.calendar_color===color?'memberColorChoice active':'memberColorChoice'} style={{background:color}} onClick={()=>void saveColor(color)} aria-label={`Usar cor ${color}`}/>)}
+        <label className="customColorChoice" title="Escolher outra cor"><input type="color" value={selectedMemberData?.calendar_color||'#6F8FAF'} onChange={e=>void saveColor(e.target.value)}/><span>+</span></label>
+      </div>
+    </div>
 
     <div className="weekSchedule multiPeriodSchedule">
       {weekdays.map((dayLabel,day)=>{
