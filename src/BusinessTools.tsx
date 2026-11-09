@@ -63,6 +63,11 @@ export default function BusinessHub({
     ])
     for(const q of [st,h,b,r,s]) if(q.error) console.warn(q.error.message)
     if(st.data) setSettings(st.data as Settings)
+    else {
+      const {data:created,error:createError}=await supabase.from('salon_business_settings').insert({salon_id:sid}).select('*').single()
+      if(createError) console.warn(createError.message)
+      if(created) setSettings(created as Settings)
+    }
     setHours((h.data||[]) as WorkingHour[])
     setBlocks((b.data||[]) as ScheduleBlock[])
     setRedemptions((r.data||[]) as Redemption[])
