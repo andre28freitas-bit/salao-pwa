@@ -33,7 +33,7 @@ const monthKey=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padS
 export type BusinessTab='dashboard'|'booking'|'team'|'dormant'|'loyalty'|'sales'|'goals'
 
 export default function BusinessHub({
-  membership,members,clients,services,appointments,visits,onChanged,initialTab='dashboard'
+  membership,members,clients,services,appointments,visits,onChanged,initialTab='dashboard',onAddStaff,onInvite
 }:{
   membership:Member
   members:Member[]
@@ -43,6 +43,8 @@ export default function BusinessHub({
   visits:Visit[]
   onChanged:()=>void|Promise<void>
   initialTab?:BusinessTab
+  onAddStaff?:()=>void
+  onInvite?:()=>void
 }){
   const [tab,setTab]=useState<BusinessTab>(initialTab)
   useEffect(()=>setTab(initialTab),[initialTab])
@@ -101,7 +103,7 @@ export default function BusinessHub({
     {saved&&<div className="businessSaved">{saved}</div>}
     {tab==='dashboard'&&<Dashboard clients={clients} appointments={appointments} visits={visits} sales={sales} settings={settings} goals={goals}/>}
     {tab==='booking'&&<BookingSettings settings={settings} setSettings={setSettings} onSaved={async()=>{flash('Configuração guardada.');await onChanged()}}/>}
-    {tab==='team'&&<TeamSchedule membership={membership} members={members} selectedMember={selectedMember} setSelectedMember={setSelectedMember} periods={periods} blocks={blocks} reload={async()=>{await load();await onChanged();flash('Equipa atualizada.')}}/>}
+    {tab==='team'&&<TeamSchedule membership={membership} members={members} selectedMember={selectedMember} setSelectedMember={setSelectedMember} periods={periods} blocks={blocks} onAddStaff={onAddStaff} onInvite={onInvite} reload={async()=>{await load();await onChanged();flash('Equipa atualizada.')}}/>}
     {tab==='dormant'&&<DormantClients clients={clients} services={services} visits={visits} settings={settings} onSettings={async next=>{setSettings(next);await onChanged();flash('Prazo atualizado.')}}/>}
     {tab==='loyalty'&&<Loyalty membership={membership} clients={clients} visits={visits} settings={settings} setSettings={setSettings} redemptions={redemptions} reload={async()=>{await load();await onChanged();flash('Fidelização atualizada.')}}/>}
     {tab==='sales'&&<Sales membership={membership} members={members} clients={clients} settings={settings} sales={sales} reload={async()=>{await load();await onChanged();flash('Venda registada.')}}/>}
@@ -174,7 +176,7 @@ function BookingSettings({settings,setSettings,onSaved}:{settings:Settings;setSe
   </form>
 }
 
-function TeamSchedule({membership,members,selectedMember,setSelectedMember,periods,blocks,reload}:{membership:Member;members:Member[];selectedMember:string;setSelectedMember:(s:string)=>void;periods:WorkingPeriod[];blocks:ScheduleBlock[];reload:()=>void|Promise<void>}){
+function TeamSchedule({membership,members,selectedMember,setSelectedMember,periods,blocks,onAddStaff,onInvite,reload}:{membership:Member;members:Member[];selectedMember:string;setSelectedMember:(s:string)=>void;periods:WorkingPeriod[];blocks:ScheduleBlock[];onAddStaff?:()=>void;onInvite?:()=>void;reload:()=>void|Promise<void>}){
   type DraftPeriod={key:string;start:string;end:string}
   const [draft,setDraft]=useState<Record<number,DraftPeriod[]>>({})
   const memberPeriods=periods.filter(p=>p.member_id===selectedMember)
@@ -262,6 +264,10 @@ function TeamSchedule({membership,members,selectedMember,setSelectedMember,perio
 
   return <div className="businessPanel teamSchedulePanel">
     <div className="businessIntro"><div><span>Equipa</span><h3>Horário e disponibilidade</h3></div><small>Usa vários períodos para almoço ou pausas recorrentes. Usa bloqueios para exceções.</small></div>
+    {(onAddStaff||onInvite)&&<div className="teamManagementActions">
+      {onAddStaff&&<button type="button" className="secondary" onClick={onAddStaff}>+ Profissional sem acesso</button>}
+      {onInvite&&<button type="button" className="secondary" onClick={onInvite}>Convidar com acesso</button>}
+    </div>}
     <label>Profissional<select value={selectedMember} onChange={e=>setSelectedMember(e.target.value)}>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select></label>
     <div className="memberColorSetting">
       <div><strong>Cor na agenda</strong><span>Ajuda a distinguir rapidamente cada profissional.</span></div>
