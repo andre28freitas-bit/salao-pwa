@@ -171,7 +171,8 @@ export default function App(){
   async function loadData(){
     if(!membership) return
     const salonId=membership.salon_id
-    const [m,s,c,a,v,p,br,bs]=await Promise.all([
+    const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString()
+    const [m,s,c,a,v,p,br,bs,dp,sa]=await Promise.all([
       supabase.from('salon_members').select('*').eq('salon_id',salonId).eq('active',true).order('display_name'),
       supabase.from('services').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
       supabase.from('clients').select('*').eq('salon_id',salonId).order('name'),
@@ -179,11 +180,16 @@ export default function App(){
       supabase.from('visits').select('*').eq('salon_id',salonId).order('occurred_on',{ascending:false}),
       supabase.from('products').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
       supabase.from('booking_requests').select('*').eq('salon_id',salonId).in('status',['new','contacted']).order('created_at',{ascending:false}),
-      supabase.from('salon_business_settings').select('salon_id,dormant_after_weeks').eq('salon_id',salonId).maybeSingle()
+      supabase.from('salon_business_settings').select('salon_id,dormant_after_weeks').eq('salon_id',salonId).maybeSingle(),
+      supabase.from('dashboard_preferences').select('widgets').eq('salon_id',salonId).eq('member_id',membership.id).maybeSingle(),
+      supabase.from('sales').select('id,occurred_at,total_amount').eq('salon_id',salonId).gte('occurred_at',monthStart).order('occurred_at',{ascending:false})
     ])
-    for(const result of [m,s,c,a,v,p,br,bs]) if(result.error) showToast(result.error.message)
+    for(const result of [m,s,c,a,v,p,br,bs,dp,sa]) if(result.error) showToast(result.error.message)
     setMembers((m.data||[]) as Member[]); setServices((s.data||[]) as Service[]); setClients((c.data||[]) as Client[])
     setAppointments((a.data||[]) as Appointment[]); setVisits((v.data||[]) as Visit[]); setProducts((p.data||[]) as Product[]); setBookingRequests((br.data||[]) as BookingRequest[]); setBusinessSettings((bs.data as BusinessSettings)||null)
+    const prefWidgets=Array.isArray(dp.data?.widgets)?dp.data.widgets.filter((x:any)=>dashboardWidgetOptions.some(w=>w.id===x)) as DashboardWidget[]:[]
+    setDashboardWidgets(prefWidgets.length?prefWidgets:defaultDashboardWidgets)
+    setMonthSales((sa.data||[]) as SaleSummary[])
   }
 
   function subscribeRealtime(){
@@ -194,11 +200,26 @@ export default function App(){
       .on('postgres_changes',{event:'*',schema:'public',table:'visits',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'products',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'booking_requests',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
+      .on('postgres_changes',{event:'*',schema:'public',table:'sales',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .subscribe()
     return ()=>{supabase.removeChannel(channel)}
   }
 
   function showToast(message:string){ setToast(message); window.setTimeout(()=>setToast(''),2600) }
+  async function saveDashboardWidgets(widgets:DashboardWidget[]){
+    if(!membership) return
+    const clean=widgets.filter((x,i)=>dashboardWidgetOptions.some(w=>w.id===x)&&widgets.indexOf(x)===i)
+    const {error}=await supabase.from('dashboard_preferences').upsert({
+      salon_id:membership.salon_id,
+      member_id:membership.id,
+      widgets:clean,
+      updated_at:new Date().toISOString()
+    },{onConflict:'salon_id,member_id'})
+    if(error){showToast(error.message);return}
+    setDashboardWidgets(clean)
+    setModal(null)
+    showToast('Dashboard personalizado.')
+  }
   async function updateBookingRequestStatus(id:string,status:'contacted'|'booked'|'closed'){
     const {error}=await supabase.from('booking_requests').update({status,updated_at:new Date().toISOString()}).eq('id',id)
     if(error) showToast(error.message); else { showToast('Pedido atualizado.'); await loadData() }
