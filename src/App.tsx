@@ -9,7 +9,7 @@ import BusinessHub, { type BusinessTab } from './BusinessTools'
 
 type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
-type Member = { id:string; salon_id:string; user_id:string|null; display_name:string; role:Role; active:boolean }
+type Member = { id:string; salon_id:string; user_id:string|null; display_name:string; role:Role; active:boolean; calendar_color:string }
 type Service = { id:string; salon_id:string; name:string; duration_minutes:number; price:number; recurrence_weeks:number|null; image_url:string|null; active:boolean }
 type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null; dormant_after_weeks:number|null }
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
@@ -364,7 +364,7 @@ export default function App(){
 
     <main className="content">
       {view==='today' && <TodayView manager={manager} widgets={dashboardWidgets} sales={salesSummary} goals={activeGoals} visits={visits} allAppointments={appointments} clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} onBusinessHub={tab=>setModal({kind:'businessHub',tab:tab||'dashboard'})} onCustomize={()=>setModal({kind:'dashboardCustomize'})} />}
-      {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
+      {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} members={members} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
@@ -579,7 +579,7 @@ function TodayView({manager,widgets,sales,goals,visits,allAppointments,clients,a
   </>
 }
 
-function AgendaView({date,setDate,items,appointments,manager,mode,setMode,membership,clientBy,serviceBy,memberBy,onNew,onOpen,onICS}:{date:string;setDate:(s:string)=>void;items:Appointment[];appointments:Appointment[];manager:boolean;mode:'mine'|'team';setMode:(m:'mine'|'team')=>void;membership:Member;clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;onNew:()=>void;onOpen:(a:Appointment)=>void;onICS:(a:Appointment)=>void}){
+function AgendaView({date,setDate,items,appointments,members,manager,mode,setMode,membership,clientBy,serviceBy,memberBy,onNew,onOpen,onICS}:{date:string;setDate:(s:string)=>void;items:Appointment[];appointments:Appointment[];members:Member[];manager:boolean;mode:'mine'|'team';setMode:(m:'mine'|'team')=>void;membership:Member;clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;onNew:()=>void;onOpen:(a:Appointment)=>void;onICS:(a:Appointment)=>void}){
   const [viewMode,setViewMode]=useState<'day'|'week'|'month'>('day')
   const personFiltered=useMemo(()=>appointments.filter(a=>{
     if(a.status==='cancelled') return false
@@ -625,14 +625,15 @@ function AgendaView({date,setDate,items,appointments,manager,mode,setMode,member
       <button className="iconButton" onClick={()=>changePeriod(-1)}>‹</button>
       <button className="periodTitle" onClick={()=>setDate(todayISO())}>{periodTitle}</button>
       <button className="iconButton" onClick={()=>changePeriod(1)}>›</button>
-      <button className="primary small" onClick={onNew}>+ Marcar</button>
+      <button className="primary small" onClick={onNew}>+ Nova marcação</button>
     </div>
 
     {manager&&<div className="segmented agendaPeopleSwitch"><button className={mode==='mine'?'active':''} onClick={()=>setMode('mine')}>Minha agenda</button><button className={mode==='team'?'active':''} onClick={()=>setMode('team')}>Equipa</button></div>}
+    {manager&&mode==='team'&&<div className="agendaTeamLegend">{members.map(m=><span key={m.id}><i style={{background:m.calendar_color||'#6F8FAF'}}/>{m.display_name}</span>)}</div>}
 
     {viewMode==='day'&&<>
       <div className="dayTitle">{dateLabel(date)}{!manager&&<span className="tag">{membership.display_name}</span>}</div>
-      <div className="timeline">{items.length?items.map(a=>{const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id);return <div className="timeRow" key={a.id}><div className="time">{hhmm(a.starts_at)}</div><article className="bookingCard"><button className="bookingMain" onClick={()=>onOpen(a)}><strong>{client?.name||'Cliente'}</strong><span>{service?.name||'Serviço'} · {member?.display_name}</span>{a.notes&&<small>{a.notes}</small>}</button><button className="calendarBtn" onClick={()=>onICS(a)} title="Adicionar ao calendário">▣</button></article></div>}):<Empty>Sem marcações neste dia.</Empty>}</div>
+      <div className="timeline">{items.length?items.map(a=>{const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id);return <div className="timeRow" key={a.id}><div className="time">{hhmm(a.starts_at)}</div><article className="bookingCard memberColorCard" style={{'--member-color':member?.calendar_color||'#6F8FAF'} as React.CSSProperties}><button className="bookingMain" onClick={()=>onOpen(a)}><strong>{client?.name||'Cliente'}</strong><span><i className="memberColorDot" style={{background:member?.calendar_color||'#6F8FAF'}}/>{service?.name||'Serviço'} · {member?.display_name}</span>{a.notes&&<small>{a.notes}</small>}</button><button className="calendarBtn" onClick={()=>onICS(a)} title="Adicionar ao calendário">▣</button></article></div>}):<Empty>Sem marcações neste dia.</Empty>}</div>
     </>}
 
     {viewMode==='week'&&<div className="weekAgenda">
@@ -646,7 +647,7 @@ function AgendaView({date,setDate,items,appointments,manager,mode,setMode,member
           </button>
           {dayItems.length?<div className="weekBookings">{dayItems.map(a=>{
             const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id)
-            return <button className="weekBooking" key={a.id} onClick={()=>onOpen(a)}><span>{hhmm(a.starts_at)}</span><div><strong>{client?.name||'Cliente'}</strong><small>{service?.name||'Serviço'} · {member?.display_name||''}</small></div></button>
+            return <button className="weekBooking memberColorCard" style={{'--member-color':member?.calendar_color||'#6F8FAF'} as React.CSSProperties} key={a.id} onClick={()=>onOpen(a)}><span>{hhmm(a.starts_at)}</span><div><strong>{client?.name||'Cliente'}</strong><small><i className="memberColorDot" style={{background:member?.calendar_color||'#6F8FAF'}}/>{service?.name||'Serviço'} · {member?.display_name||''}</small></div></button>
           })}</div>:<div className="weekEmpty">Sem marcações</div>}
         </section>
       })}
@@ -655,14 +656,16 @@ function AgendaView({date,setDate,items,appointments,manager,mode,setMode,member
     {viewMode==='month'&&<div className="monthCalendar">
       <div className="monthWeekdays">{['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d=><span key={d}>{d}</span>)}</div>
       <div className="monthGrid">{monthDays.map(day=>{
-        const count=appointmentsForDay(day).length
+        const dayAppointments=appointmentsForDay(day)
+        const count=dayAppointments.length
+        const memberColors=[...new Set(dayAppointments.map(a=>memberBy(a.employee_id)?.calendar_color||'#6F8FAF'))].slice(0,4)
         const d=new Date(`${day}T12:00:00`)
         const outside=d.getMonth()!==monthDate.getMonth()
         const isToday=day===todayISO()
         const selected=day===date
         return <button key={day} className={`monthDay ${outside?'outside':''} ${isToday?'today':''} ${selected?'selected':''}`} onClick={()=>openDay(day)}>
           <span className="monthDayNumber">{d.getDate()}</span>
-          {count>0&&<span className="monthCount">{count}</span>}
+          {count>0&&<><span className="monthCount">{count}</span><span className="monthMemberDots">{memberColors.map((color,index)=><i key={index} style={{background:color}}/>)}</span></>}
         </button>
       })}</div>
       <div className="monthLegend">Toca num dia para abrir a agenda diária.</div>
