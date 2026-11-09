@@ -17,10 +17,11 @@ type Settings={
   loyalty_reward_text:string
   commission_default_percent:number
 }
-type WorkingHour={id:string;member_id:string;weekday:number;enabled:boolean;start_time:string;end_time:string}
+type WorkingPeriod={id:string;member_id:string;weekday:number;start_time:string;end_time:string;sort_order:number}
 type ScheduleBlock={id:string;member_id:string;starts_at:string;ends_at:string;reason:string|null}
 type Redemption={id:string;client_id:string;visits_required_snapshot:number;reward_text:string;redeemed_at:string}
 type Sale={id:string;client_id:string|null;employee_id:string;occurred_at:string;total_amount:number;payment_method:string;commission_percent:number;commission_amount:number;notes:string|null}
+type Goal={id:string;goal_type:'revenue'|'services'|'appointments';title:string|null;target_value:number;period_start:string;period_end:string;active:boolean}
 
 const weekdays=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 const euro=(n:number)=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(n||0))
@@ -28,7 +29,7 @@ const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(
 const weeksSince=(iso:string)=>Math.max(0,Math.floor((Date.now()-new Date(`${iso}T12:00:00`).getTime())/(7*86400000)))
 const monthKey=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
 
-export type BusinessTab='dashboard'|'booking'|'team'|'dormant'|'loyalty'|'sales'
+export type BusinessTab='dashboard'|'booking'|'team'|'dormant'|'loyalty'|'sales'|'goals'
 
 export default function BusinessHub({
   membership,members,clients,services,appointments,visits,onChanged,initialTab='dashboard'
@@ -46,10 +47,11 @@ export default function BusinessHub({
   useEffect(()=>setTab(initialTab),[initialTab])
   const [loading,setLoading]=useState(true)
   const [settings,setSettings]=useState<Settings|null>(null)
-  const [hours,setHours]=useState<WorkingHour[]>([])
+  const [periods,setPeriods]=useState<WorkingPeriod[]>([])
   const [blocks,setBlocks]=useState<ScheduleBlock[]>([])
   const [redemptions,setRedemptions]=useState<Redemption[]>([])
   const [sales,setSales]=useState<Sale[]>([])
+  const [goals,setGoals]=useState<Goal[]>([])
   const [selectedMember,setSelectedMember]=useState(members[0]?.id||'')
   const [saved,setSaved]=useState('')
 
@@ -58,24 +60,26 @@ export default function BusinessHub({
   async function load(){
     setLoading(true)
     const sid=membership.salon_id
-    const [st,h,b,r,s]=await Promise.all([
+    const [st,p,b,r,s,g]=await Promise.all([
       supabase.from('salon_business_settings').select('*').eq('salon_id',sid).maybeSingle(),
-      supabase.from('member_working_hours').select('*').eq('salon_id',sid).order('weekday'),
+      supabase.from('member_working_periods').select('*').eq('salon_id',sid).order('weekday').order('sort_order'),
       supabase.from('member_schedule_blocks').select('*').eq('salon_id',sid).gte('ends_at',new Date().toISOString()).order('starts_at'),
       supabase.from('loyalty_redemptions').select('*').eq('salon_id',sid).order('redeemed_at',{ascending:false}),
-      supabase.from('sales').select('*').eq('salon_id',sid).order('occurred_at',{ascending:false}).limit(100)
+      supabase.from('sales').select('*').eq('salon_id',sid).order('occurred_at',{ascending:false}).limit(500),
+      supabase.from('business_goals').select('*').eq('salon_id',sid).eq('active',true).order('period_end')
     ])
-    for(const q of [st,h,b,r,s]) if(q.error) console.warn(q.error.message)
+    for(const q of [st,p,b,r,s,g]) if(q.error) console.warn(q.error.message)
     if(st.data) setSettings(st.data as Settings)
     else {
       const {data:created,error:createError}=await supabase.from('salon_business_settings').insert({salon_id:sid}).select('*').single()
       if(createError) console.warn(createError.message)
       if(created) setSettings(created as Settings)
     }
-    setHours((h.data||[]) as WorkingHour[])
+    setPeriods((p.data||[]) as WorkingPeriod[])
     setBlocks((b.data||[]) as ScheduleBlock[])
     setRedemptions((r.data||[]) as Redemption[])
     setSales((s.data||[]) as Sale[])
+    setGoals((g.data||[]) as Goal[])
     setLoading(false)
   }
 
@@ -91,18 +95,20 @@ export default function BusinessHub({
       <button className={tab==='dormant'?'active':''} onClick={()=>setTab('dormant')}>Adormecidos</button>
       <button className={tab==='loyalty'?'active':''} onClick={()=>setTab('loyalty')}>Fidelização</button>
       <button className={tab==='sales'?'active':''} onClick={()=>setTab('sales')}>Vendas</button>
+      <button className={tab==='goals'?'active':''} onClick={()=>setTab('goals')}>Objetivos</button>
     </div>
     {saved&&<div className="businessSaved">{saved}</div>}
-    {tab==='dashboard'&&<Dashboard clients={clients} appointments={appointments} visits={visits} sales={sales} settings={settings}/>}
+    {tab==='dashboard'&&<Dashboard clients={clients} appointments={appointments} visits={visits} sales={sales} settings={settings} goals={goals}/>}
     {tab==='booking'&&<BookingSettings settings={settings} setSettings={setSettings} onSaved={async()=>{flash('Configuração guardada.');await onChanged()}}/>}
-    {tab==='team'&&<TeamSchedule membership={membership} members={members} selectedMember={selectedMember} setSelectedMember={setSelectedMember} hours={hours} blocks={blocks} reload={async()=>{await load();flash('Horário atualizado.')}}/>}
+    {tab==='team'&&<TeamSchedule membership={membership} members={members} selectedMember={selectedMember} setSelectedMember={setSelectedMember} periods={periods} blocks={blocks} reload={async()=>{await load();flash('Horário atualizado.')}}/>}
     {tab==='dormant'&&<DormantClients clients={clients} services={services} visits={visits} settings={settings} onSettings={async next=>{setSettings(next);await onChanged();flash('Prazo atualizado.')}}/>}
     {tab==='loyalty'&&<Loyalty membership={membership} clients={clients} visits={visits} settings={settings} setSettings={setSettings} redemptions={redemptions} reload={async()=>{await load();await onChanged();flash('Fidelização atualizada.')}}/>}
     {tab==='sales'&&<Sales membership={membership} members={members} clients={clients} settings={settings} sales={sales} reload={async()=>{await load();await onChanged();flash('Venda registada.')}}/>}
+    {tab==='goals'&&<Goals membership={membership} goals={goals} sales={sales} visits={visits} appointments={appointments} reload={async()=>{await load();await onChanged();flash('Objetivos atualizados.')}}/>}
   </div>
 }
 
-function Dashboard({clients,appointments,visits,sales,settings}:{clients:Client[];appointments:Appointment[];visits:Visit[];sales:Sale[];settings:Settings}){
+function Dashboard({clients,appointments,visits,sales,settings,goals}:{clients:Client[];appointments:Appointment[];visits:Visit[];sales:Sale[];settings:Settings;goals:Goal[]}){
   const month=monthKey()
   const monthVisits=visits.filter(v=>v.occurred_on.startsWith(month))
   const monthSales=sales.filter(s=>localDate(new Date(s.occurred_at)).startsWith(month))
@@ -126,9 +132,12 @@ function Dashboard({clients,appointments,visits,sales,settings}:{clients:Client[
       <Metric label="Adormecidos" value={String(dormant)} />
       <Metric label="Vendas registadas" value={String(monthSales.length)} />
     </div>
+    {goals.length>0&&<div className="goalSnapshot">
+      <div className="businessSubhead"><h4>Objetivos ativos</h4><span>Progresso calculado automaticamente.</span></div>
+      {goals.slice(0,3).map(goal=><GoalProgress key={goal.id} goal={goal} sales={sales} visits={visits} appointments={appointments}/>)}
+    </div>}
   </div>
 }
-
 function Metric({label,value}:{label:string;value:string}){return <div className="businessMetric"><span>{label}</span><strong>{value}</strong></div>}
 
 function BookingSettings({settings,setSettings,onSaved}:{settings:Settings;setSettings:(s:Settings)=>void;onSaved:()=>void|Promise<void>}){
@@ -164,50 +173,123 @@ function BookingSettings({settings,setSettings,onSaved}:{settings:Settings;setSe
   </form>
 }
 
-function TeamSchedule({membership,members,selectedMember,setSelectedMember,hours,blocks,reload}:{membership:Member;members:Member[];selectedMember:string;setSelectedMember:(s:string)=>void;hours:WorkingHour[];blocks:ScheduleBlock[];reload:()=>void|Promise<void>}){
-  const memberHours=hours.filter(h=>h.member_id===selectedMember)
-  const [draft,setDraft]=useState<Record<number,{enabled:boolean;start:string;end:string}>>({})
+function TeamSchedule({membership,members,selectedMember,setSelectedMember,periods,blocks,reload}:{membership:Member;members:Member[];selectedMember:string;setSelectedMember:(s:string)=>void;periods:WorkingPeriod[];blocks:ScheduleBlock[];reload:()=>void|Promise<void>}){
+  type DraftPeriod={key:string;start:string;end:string}
+  const [draft,setDraft]=useState<Record<number,DraftPeriod[]>>({})
+  const memberPeriods=periods.filter(p=>p.member_id===selectedMember)
+
   useEffect(()=>{
-    const next:Record<number,{enabled:boolean;start:string;end:string}>={}
-    for(let d=0;d<7;d++){const row=memberHours.find(h=>h.weekday===d);next[d]={enabled:row?.enabled??(d!==0),start:(row?.start_time||'09:00').slice(0,5),end:(row?.end_time||'18:00').slice(0,5)}}
+    const next:Record<number,DraftPeriod[]>={}
+    for(let d=0;d<7;d++){
+      next[d]=memberPeriods
+        .filter(p=>p.weekday===d)
+        .sort((a,b)=>a.sort_order-b.sort_order)
+        .map(p=>({key:p.id,start:p.start_time.slice(0,5),end:p.end_time.slice(0,5)}))
+    }
     setDraft(next)
-  },[selectedMember,hours.length])
+  },[selectedMember,periods])
+
+  function addPeriod(day:number){
+    setDraft(current=>({...current,[day]:[...(current[day]||[]),{key:crypto.randomUUID(),start:'14:00',end:'18:00'}]}))
+  }
+  function updatePeriod(day:number,key:string,field:'start'|'end',value:string){
+    setDraft(current=>({...current,[day]:(current[day]||[]).map(p=>p.key===key?{...p,[field]:value}:p)}))
+  }
+  function removePeriod(day:number,key:string){
+    setDraft(current=>({...current,[day]:(current[day]||[]).filter(p=>p.key!==key)}))
+  }
+  function toggleDay(day:number,enabled:boolean){
+    setDraft(current=>({...current,[day]:enabled?(current[day]?.length?current[day]:[{key:crypto.randomUUID(),start:'09:00',end:'18:00'}]):[]}))
+  }
 
   async function saveWeek(){
     if(!selectedMember)return
-    const rows=Object.entries(draft).map(([weekday,x])=>({salon_id:membership.salon_id,member_id:selectedMember,weekday:Number(weekday),enabled:x.enabled,start_time:x.start,end_time:x.end,updated_at:new Date().toISOString()}))
-    const {error}=await supabase.from('member_working_hours').upsert(rows,{onConflict:'member_id,weekday'})
-    if(error)return alert(error.message)
+    for(const [day,dayPeriods] of Object.entries(draft)){
+      const sorted=[...dayPeriods].sort((a,b)=>a.start.localeCompare(b.start))
+      for(let i=0;i<sorted.length;i++){
+        if(!sorted[i].start||!sorted[i].end||sorted[i].end<=sorted[i].start) return alert(`Revê o horário de ${weekdays[Number(day)]}: a hora final deve ser posterior à inicial.`)
+        if(i>0&&sorted[i].start<sorted[i-1].end) return alert(`Existem períodos sobrepostos em ${weekdays[Number(day)]}.`)
+      }
+    }
+    const {error:deleteError}=await supabase.from('member_working_periods').delete().eq('member_id',selectedMember)
+    if(deleteError)return alert(deleteError.message)
+    const rows=Object.entries(draft).flatMap(([weekday,dayPeriods])=>[...dayPeriods].sort((a,b)=>a.start.localeCompare(b.start)).map((p,index)=>({
+      salon_id:membership.salon_id,
+      member_id:selectedMember,
+      weekday:Number(weekday),
+      start_time:p.start,
+      end_time:p.end,
+      sort_order:index,
+      updated_at:new Date().toISOString()
+    })))
+    if(rows.length){
+      const {error}=await supabase.from('member_working_periods').insert(rows)
+      if(error)return alert(error.message)
+    }
     await reload()
   }
+
   async function block(e:FormEvent<HTMLFormElement>){
-    e.preventDefault(); const fd=new FormData(e.currentTarget); const date=String(fd.get('date')); const start=String(fd.get('start')); const end=String(fd.get('end'))
-    const {error}=await supabase.from('member_schedule_blocks').insert({salon_id:membership.salon_id,member_id:selectedMember,starts_at:new Date(`${date}T${start}:00`).toISOString(),ends_at:new Date(`${date}T${end}:00`).toISOString(),reason:String(fd.get('reason')||'')||null})
+    e.preventDefault()
+    const fd=new FormData(e.currentTarget)
+    const date=String(fd.get('date'))
+    const start=String(fd.get('start'))
+    const end=String(fd.get('end'))
+    if(end<=start)return alert('A hora final deve ser posterior à hora inicial.')
+    const {error}=await supabase.from('member_schedule_blocks').insert({
+      salon_id:membership.salon_id,
+      member_id:selectedMember,
+      starts_at:new Date(`${date}T${start}:00`).toISOString(),
+      ends_at:new Date(`${date}T${end}:00`).toISOString(),
+      reason:String(fd.get('reason')||'')||null
+    })
     if(error)return alert(error.message)
-    e.currentTarget.reset(); await reload()
+    e.currentTarget.reset()
+    await reload()
   }
   async function removeBlock(id:string){const {error}=await supabase.from('member_schedule_blocks').delete().eq('id',id);if(error)return alert(error.message);await reload()}
 
-  return <div className="businessPanel">
-    <div className="businessIntro"><div><span>Equipa</span><h3>Horário e bloqueios</h3></div><small>Define o horário normal e bloqueia períodos quando necessário.</small></div>
+  return <div className="businessPanel teamSchedulePanel">
+    <div className="businessIntro"><div><span>Equipa</span><h3>Horário e disponibilidade</h3></div><small>Usa vários períodos para almoço ou pausas recorrentes. Usa bloqueios para exceções.</small></div>
     <label>Profissional<select value={selectedMember} onChange={e=>setSelectedMember(e.target.value)}>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select></label>
-    <div className="weekSchedule">
-      {Object.entries(draft).map(([day,row])=><div className="weekRow" key={day}>
-        <label className="dayToggle"><input type="checkbox" checked={row.enabled} onChange={e=>setDraft({...draft,[Number(day)]:{...row,enabled:e.target.checked}})}/><strong>{weekdays[Number(day)]}</strong></label>
-        {row.enabled?<div className="timePair"><input type="time" value={row.start} onChange={e=>setDraft({...draft,[Number(day)]:{...row,start:e.target.value}})}/><span>—</span><input type="time" value={row.end} onChange={e=>setDraft({...draft,[Number(day)]:{...row,end:e.target.value}})}/></div>:<span className="muted small">Folga</span>}
-      </div>)}
+
+    <div className="weekSchedule multiPeriodSchedule">
+      {weekdays.map((dayLabel,day)=>{
+        const dayPeriods=draft[day]||[]
+        const enabled=dayPeriods.length>0
+        return <div className="weekRow multiPeriodDay" key={day}>
+          <div className="dayHeaderRow">
+            <label className="dayToggle"><input type="checkbox" checked={enabled} onChange={e=>toggleDay(day,e.target.checked)}/><strong>{dayLabel}</strong></label>
+            {!enabled&&<span className="muted small">Folga</span>}
+          </div>
+          {enabled&&<div className="periodList">
+            {dayPeriods.map((period,index)=><div className="periodRow" key={period.key}>
+              <span className="periodLabel">{index===0?'Período':'+'}</span>
+              <input type="time" value={period.start} onChange={e=>updatePeriod(day,period.key,'start',e.target.value)}/>
+              <span className="periodDash">—</span>
+              <input type="time" value={period.end} onChange={e=>updatePeriod(day,period.key,'end',e.target.value)}/>
+              {dayPeriods.length>1&&<button className="periodRemove" type="button" onClick={()=>removePeriod(day,period.key)} aria-label="Remover período">×</button>}
+            </div>)}
+            <button className="addPeriodButton" type="button" onClick={()=>addPeriod(day)}>+ Adicionar período</button>
+          </div>}
+        </div>
+      })}
     </div>
     <button className="primary full" onClick={()=>void saveWeek()}>Guardar horário</button>
-    <div className="businessSubhead"><h4>Bloquear agenda</h4><span>Consulta, férias, pausa ou outro impedimento.</span></div>
-    <form className="formStack" onSubmit={block}>
-      <div className="grid2"><label>Data<input name="date" type="date" min={localDate(new Date())} required/></label><label>Motivo<input name="reason" placeholder="Ex.: Consulta"/></label></div>
-      <div className="grid2"><label>Das<input name="start" type="time" required/></label><label>Até<input name="end" type="time" required/></label></div>
+
+    <div className="businessSubhead"><h4>Bloqueio pontual</h4><span>Consulta, férias, formação ou outro impedimento numa data específica.</span></div>
+    <form className="formStack scheduleBlockForm" onSubmit={block}>
+      <div className="blockFormGrid">
+        <label>Data<input name="date" type="date" min={localDate(new Date())} required/></label>
+        <label>Motivo<input name="reason" placeholder="Ex.: Consulta"/></label>
+        <label>Das<input name="start" type="time" required/></label>
+        <label>Até<input name="end" type="time" required/></label>
+      </div>
       <button className="secondary full">+ Adicionar bloqueio</button>
     </form>
     <div className="businessList">{blocks.filter(b=>b.member_id===selectedMember).map(b=><div className="businessListRow" key={b.id}><div><strong>{new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short'}).format(new Date(b.starts_at))} · {new Date(b.starts_at).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})}–{new Date(b.ends_at).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})}</strong><span>{b.reason||'Agenda bloqueada'}</span></div><button className="textButton" onClick={()=>void removeBlock(b.id)}>Remover</button></div>)}</div>
   </div>
 }
-
 function DormantClients({clients,services,visits,settings,onSettings}:{clients:Client[];services:Service[];visits:Visit[];settings:Settings;onSettings:(s:Settings)=>void|Promise<void>}){
   const [weeks,setWeeks]=useState(settings.dormant_after_weeks)
   const rows=useMemo(()=>clients.map(c=>{
@@ -253,6 +335,72 @@ function Loyalty({membership,clients,visits,settings,setSettings,redemptions,rel
     <div className="grid2"><label>Visitas necessárias<input type="number" min="2" max="50" value={settings.loyalty_visits_required} onChange={e=>setSettings({...settings,loyalty_visits_required:Number(e.target.value)})}/></label><label>Recompensa<input value={settings.loyalty_reward_text} onChange={e=>setSettings({...settings,loyalty_reward_text:e.target.value})} placeholder="Ex.: 10% de desconto"/></label></div>
     <button className="secondary full" onClick={()=>void save()}>Guardar programa</button>
     {settings.loyalty_enabled&&<div className="businessList">{ranked.slice(0,12).map(({client,count})=>{const ready=count>=settings.loyalty_visits_required;return <div className="loyaltyRow" key={client.id}><div className="loyaltyClient"><strong>{client.name}</strong><span>{Math.min(count,settings.loyalty_visits_required)} / {settings.loyalty_visits_required} visitas</span><div className="loyaltyBar"><i style={{width:`${Math.min(100,count/settings.loyalty_visits_required*100)}%`}}/></div></div>{ready?<button className="primary small" onClick={()=>void redeem(client)}>Usar recompensa</button>:<b>{settings.loyalty_visits_required-count} em falta</b>}</div>})}</div>}
+  </div>
+}
+
+function goalValue(goal:Goal,sales:Sale[],visits:Visit[],appointments:Appointment[]){
+  if(goal.goal_type==='revenue') return sales.filter(s=>localDate(new Date(s.occurred_at))>=goal.period_start&&localDate(new Date(s.occurred_at))<=goal.period_end).reduce((n,s)=>n+Number(s.total_amount||0),0)
+  if(goal.goal_type==='services') return visits.filter(v=>v.occurred_on>=goal.period_start&&v.occurred_on<=goal.period_end).length
+  return appointments.filter(a=>a.status==='completed'&&localDate(new Date(a.starts_at))>=goal.period_start&&localDate(new Date(a.starts_at))<=goal.period_end).length
+}
+function goalLabel(type:Goal['goal_type']){return type==='revenue'?'Faturação':type==='services'?'Serviços concluídos':'Marcações concluídas'}
+function GoalProgress({goal,sales,visits,appointments}:{goal:Goal;sales:Sale[];visits:Visit[];appointments:Appointment[]}){
+  const current=goalValue(goal,sales,visits,appointments)
+  const percent=Math.min(100,Math.round(current/Number(goal.target_value)*100))
+  const value=goal.goal_type==='revenue'?euro(current):String(current)
+  const target=goal.goal_type==='revenue'?euro(goal.target_value):String(Number(goal.target_value))
+  return <div className="goalProgressCard">
+    <div className="goalProgressTop"><div><strong>{goal.title||goalLabel(goal.goal_type)}</strong><span>{new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short'}).format(new Date(goal.period_start+'T12:00:00'))} — {new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'short'}).format(new Date(goal.period_end+'T12:00:00'))}</span></div><b>{percent}%</b></div>
+    <div className="goalBar"><i style={{width:`${percent}%`}}/></div>
+    <div className="goalNumbers"><strong>{value}</strong><span>de {target}</span></div>
+  </div>
+}
+
+function Goals({membership,goals,sales,visits,appointments,reload}:{membership:Member;goals:Goal[];sales:Sale[];visits:Visit[];appointments:Appointment[];reload:()=>void|Promise<void>}){
+  const [open,setOpen]=useState(false)
+  const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1)
+  const monthEnd=new Date(new Date().getFullYear(),new Date().getMonth()+1,0)
+
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    const fd=new FormData(e.currentTarget)
+    const {error}=await supabase.from('business_goals').insert({
+      salon_id:membership.salon_id,
+      goal_type:String(fd.get('goal_type')),
+      title:String(fd.get('title')||'').trim()||null,
+      target_value:Number(fd.get('target_value')||0),
+      period_start:String(fd.get('period_start')),
+      period_end:String(fd.get('period_end')),
+      active:true
+    })
+    if(error)return alert(error.message)
+    setOpen(false)
+    await reload()
+  }
+  async function archive(id:string){
+    const {error}=await supabase.from('business_goals').update({active:false,updated_at:new Date().toISOString()}).eq('id',id)
+    if(error)return alert(error.message)
+    await reload()
+  }
+
+  return <div className="businessPanel">
+    <div className="businessIntro"><div><span>Performance</span><h3>Objetivos</h3></div><button className="primary small" onClick={()=>setOpen(!open)}>+ Objetivo</button></div>
+    <p className="formHint goalHint">Define uma meta e o sistema calcula o progresso automaticamente com base nos dados já registados.</p>
+    {open&&<form className="formStack goalForm" onSubmit={submit}>
+      <div className="goalTypeCards">
+        <label><input type="radio" name="goal_type" value="revenue" defaultChecked/><strong>Faturação</strong><span>Ex.: atingir 10.000 € no mês.</span></label>
+        <label><input type="radio" name="goal_type" value="services"/><strong>Serviços</strong><span>Ex.: realizar 250 serviços.</span></label>
+        <label><input type="radio" name="goal_type" value="appointments"/><strong>Marcações</strong><span>Ex.: concluir 220 marcações.</span></label>
+      </div>
+      <label>Nome <span className="optionalLabel">opcional</span><input name="title" placeholder="Ex.: Objetivo de novembro"/></label>
+      <label>Meta<input name="target_value" type="number" min="1" step="0.01" required placeholder="Ex.: 10000"/></label>
+      <div className="blockFormGrid">
+        <label>De<input name="period_start" type="date" defaultValue={localDate(monthStart)} required/></label>
+        <label>Até<input name="period_end" type="date" defaultValue={localDate(monthEnd)} required/></label>
+      </div>
+      <button className="primary full">Criar objetivo</button>
+    </form>}
+    <div className="goalList">{goals.length?goals.map(goal=><div className="goalItem" key={goal.id}><GoalProgress goal={goal} sales={sales} visits={visits} appointments={appointments}/><button className="textButton" onClick={()=>void archive(goal.id)}>Arquivar</button></div>):<div className="empty">Ainda não existem objetivos ativos.</div>}</div>
   </div>
 }
 
