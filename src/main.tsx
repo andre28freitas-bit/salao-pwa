@@ -5,6 +5,7 @@ import App from './App'
 import './styles.css'
 import './landing.css'
 import './barber-demo.css'
+import './business-tools.css'
 
 registerSW({ immediate: true })
 
