@@ -508,3 +508,14 @@
   .appMenuPanel{height:calc(100dvh - 76px)}
   .modalCard:has(.businessHub){padding:22px}
 }
+
+.homeGoalList{display:grid;gap:10px}
+.homeGoalRow{display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,1.3fr) auto;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.homeGoalRow:last-child{border-bottom:0}
+.homeGoalRow>div:first-child{display:grid;gap:2px}.homeGoalRow strong{font-size:12px}.homeGoalRow span{font-size:9px;color:var(--muted)}
+.homeGoalProgress{height:7px;background:var(--soft);border-radius:99px;overflow:hidden}.homeGoalProgress i{display:block;height:100%;background:var(--ink);border-radius:99px}
+.homeGoalRow>b{font-size:12px;min-width:34px;text-align:right}
+@media(max-width:520px){
+  .homeGoalRow{grid-template-columns:minmax(0,1fr) auto}
+  .homeGoalProgress{grid-column:1/-1;grid-row:2}
+}
