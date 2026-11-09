@@ -1583,7 +1583,7 @@ function Empty({children}:{children:ReactNode}){return <div className="empty">{c
 function InfoCard({label,children}:{label:string;children:ReactNode}){return <div className="infoCard"><span>{label}</span><strong>{children}</strong></div>}
 
 function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):m.kind==='siteSettings'?'Website e contactos':m.kind==='businessHub'?'Gestão do negócio':m.kind==='dashboardCustomize'?'Personalizar página inicial':'Convidar colaborador'}
-function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Conta'} as const)[v]}
+function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock'} as const)[v]}
 function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock'} as const)[v]}
 function NavGlyph({view}:{view:View}){
   if(view==='today') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.6 12 3.8l8.5 6.8v9.1a.8.8 0 0 1-.8.8H4.3a.8.8 0 0 1-.8-.8v-9.1Z"/><path d="M9 20.5v-6.2h6v6.2"/></svg>
