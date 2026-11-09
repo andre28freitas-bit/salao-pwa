@@ -334,7 +334,7 @@ export default function App(){
     />
 
     <main className="content">
-      {view==='today' && <TodayView manager={manager} widgets={dashboardWidgets} sales={salesSummary} goals={activeGoals} visits={visits} allAppointments={appointments} clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} onBusinessHub={()=>setModal({kind:'businessHub',tab:'dashboard'})} onCustomize={()=>setModal({kind:'dashboardCustomize'})} />}
+      {view==='today' && <TodayView manager={manager} widgets={dashboardWidgets} sales={salesSummary} goals={activeGoals} visits={visits} allAppointments={appointments} clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} onBusinessHub={tab=>setModal({kind:'businessHub',tab:tab||'dashboard'})} onCustomize={()=>setModal({kind:'dashboardCustomize'})} />}
       {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
@@ -433,7 +433,7 @@ function AppMenu({open,manager,businessOpen,setBusinessOpen,onClose,onView,onBus
   </div>
 }
 
-function TodayView({manager,widgets,sales,goals,visits,allAppointments,clients,appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus,onBookingSchedule,onBusinessHub,onCustomize}:{manager:boolean;widgets:DashboardWidget[];sales:SaleSummary[];goals:GoalSummary[];visits:Visit[];allAppointments:Appointment[];clients:Client[];appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onBookingSchedule:(request:BookingRequest)=>void;onBusinessHub:()=>void;onCustomize:()=>void}){
+function TodayView({manager,widgets,sales,goals,visits,allAppointments,clients,appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus,onBookingSchedule,onBusinessHub,onCustomize}:{manager:boolean;widgets:DashboardWidget[];sales:SaleSummary[];goals:GoalSummary[];visits:Visit[];allAppointments:Appointment[];clients:Client[];appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onBookingSchedule:(request:BookingRequest)=>void;onBusinessHub:(tab?:BusinessTab)=>void;onCustomize:()=>void}){
   const currentMonth=localISODate(new Date()).slice(0,7)
   const monthSales=sales.filter(s=>localISODate(new Date(s.occurred_at)).startsWith(currentMonth))
   const revenue=monthSales.reduce((n,s)=>n+Number(s.total_amount||0),0)
@@ -447,16 +447,16 @@ function TodayView({manager,widgets,sales,goals,visits,allAppointments,clients,a
     </div>
 
     if(id==='business'&&manager) return <button className="businessShortcut" key={id} onClick={onBusinessHub}>
-      <div className="businessShortcutIcon">◫</div><div><span>GESTÃO DO NEGÓCIO</span><strong>Dashboard, vendas, fidelização e equipa</strong><small>Gerir operação e acompanhar resultados</small></div><b>›</b>
+      <div className="businessShortcutIcon">◫</div><div><span>GESTÃO DO NEGÓCIO</span><strong>Dashboard, objetivos, vendas, fidelização e equipa</strong><small>Gerir operação e acompanhar resultados</small></div><b>›</b>
     </button>
 
     if(id==='sales'&&manager) return <section className="dashboardWidget" key={id}>
-      <div className="dashboardWidgetHead"><div><span>Este mês</span><h2>Vendas</h2></div><button className="mini" onClick={onBusinessHub}>Abrir gestão</button></div>
+      <div className="dashboardWidgetHead"><div><span>Este mês</span><h2>Vendas</h2></div><button className="mini" onClick={()=>onBusinessHub('sales')}>Abrir gestão</button></div>
       <div className="dashboardSalesGrid"><div><span>Faturação registada</span><strong>{money(revenue)}</strong></div><div><span>Ticket médio</span><strong>{money(ticket)}</strong></div><div><span>Vendas</span><strong>{monthSales.length}</strong></div></div>
     </section>
 
     if(id==='goals'&&manager) return <section className="dashboardWidget dashboardGoalsWidget" key={id}>
-      <div className="dashboardWidgetHead"><div><span>Performance</span><h2>Objetivos</h2></div><button className="mini" onClick={onBusinessHub}>Gerir</button></div>
+      <div className="dashboardWidgetHead"><div><span>Performance</span><h2>Objetivos</h2></div><button className="mini" onClick={()=>onBusinessHub('goals')}>Gerir</button></div>
       {goals.length?<div className="homeGoalList">{goals.slice(0,3).map(goal=>{
         const current=goal.goal_type==='revenue'
           ? sales.filter(s=>localISODate(new Date(s.occurred_at))>=goal.period_start&&localISODate(new Date(s.occurred_at))<=goal.period_end).reduce((n,s)=>n+Number(s.total_amount||0),0)
