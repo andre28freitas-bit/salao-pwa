@@ -331,7 +331,13 @@ export default function App(){
       onLogout={()=>supabase.auth.signOut()}
     />
     <header className="topbar">
-      <div><div className="eyebrow">{salon?.name||'SALÃO'}</div><h1>{titleFor(view)}</h1></div>
+      <div className="topbarLeft">
+        <div className="mobileHeaderBrand">
+          <div className="mobileHeaderLogo">{brandSettings.logo_url?<img src={brandSettings.logo_url} alt={salon?.name||'Salão'}/>:<span>{initials(salon?.name||'Salão')}</span>}</div>
+          <div className="mobileHeaderCopy"><span>{salon?.name||'SALÃO'}</span><strong>{titleFor(view)}</strong></div>
+        </div>
+        <div className="desktopHeaderCopy"><div className="eyebrow">{salon?.name||'SALÃO'}</div><h1>{titleFor(view)}</h1></div>
+      </div>
       <div className="topbarActions">
         <button className="avatar" onClick={()=>setView('more')} aria-label="Abrir conta">{initials(membership.display_name)}</button>
         <button className={menuOpen?'appMenuToggle open':'appMenuToggle'} onClick={()=>setMenuOpen(v=>!v)} aria-label={menuOpen?'Fechar menu':'Abrir menu'} aria-expanded={menuOpen}>
@@ -366,7 +372,7 @@ export default function App(){
     </main>
 
     <nav className="bottomNav">
-      {(['today','agenda','clients','alerts','stock'] as View[]).map(v=><button key={v} className={view===v?'active':''} onClick={()=>setView(v)}><span>{navIcon(v)}</span><small>{navLabel(v)}</small></button>)}
+      {(['today','agenda','clients','alerts','stock'] as View[]).map(v=><button key={v} className={view===v?'active':''} onClick={()=>setView(v)}><span className="navGlyph"><NavGlyph view={v}/></span><small>{navLabel(v)}</small></button>)}
     </nav>
 
     {modal && <ModalLayer modal={modal} close={()=>setModal(null)} membership={membership} members={members} services={services} clients={clients} appointments={appointments} visits={visits} products={products} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} manager={manager} dashboardWidgets={dashboardWidgets} onDashboardSaved={saveDashboardWidgets} onSaved={async(message)=>{setModal(null);showToast(message);await loadData()}} onOpen={(m)=>setModal(m)} onDataChanged={loadData} />}
@@ -1514,13 +1520,21 @@ function AppointmentCard({a,c,s,m,salonName,onClient}:{a:Appointment;c?:Client;s
 function RetentionCard({r,onBook}:{r:{client:Client;last:Visit;due:number;passed:number;late:number};onBook:()=>void}){const text=`Olá ${firstName(r.client.name)} 😊 Já passaram cerca de ${r.passed} semanas desde a tua última visita. Queres que te reserve um horário?`;return <article className="card"><strong>{r.client.name}</strong><span>Última visita: {new Intl.DateTimeFormat(locale).format(new Date(`${r.last.occurred_on}T12:00:00`))} · habitual {r.due} semanas</span><div className="tagRow"><span className={`tag ${r.late>=2?'danger':'warn'}`}>{r.late===0?'Está na altura':`${r.late} sem. em atraso`}</span></div><div className="miniActions"><button className="mini dark" onClick={()=>whatsApp(r.client.phone,text)}>WhatsApp</button><button className="mini" onClick={()=>smsMessage(r.client.phone,text)}>SMS</button><button className="mini" onClick={onBook}>Marcar</button></div></article>}
 function ProductCard({p,actions}:{p:Product;actions?:ReactNode}){const low=Number(p.current_stock)<=Number(p.min_stock);return <article className="card"><strong>{p.name}</strong><span>{p.brand||''}{p.barcode?` · ${p.barcode}`:''}</span><div className="tagRow"><span className={`tag ${low?'danger':'ok'}`}>Stock: {p.current_stock} {p.unit}</span><span className="tag">Mín.: {p.min_stock}</span></div>{actions&&<div className="miniActions">{actions}</div>}</article>}
 function Kpi({label,value,sub}:{label:string;value:number;sub:string}){return <article className="kpi"><span>{label}</span><strong>{value}</strong><small>{sub}</small></article>}
-function Section({title,children}:{title:string;children:ReactNode}){return <section><div className="sectionHead"><h2>{title}</h2></div><div className="stack">{children}</div></section>}
+function Section({title,children}:{title:string;children:ReactNode}){return <section className="dashboardSection"><div className="sectionHead"><h2>{title}</h2></div><div className="stack">{children}</div></section>}
 function Empty({children}:{children:ReactNode}){return <div className="empty">{children}</div>}
 function InfoCard({label,children}:{label:string;children:ReactNode}){return <div className="infoCard"><span>{label}</span><strong>{children}</strong></div>}
 
 function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):m.kind==='siteSettings'?'Website e contactos':m.kind==='businessHub'?'Gestão do negócio':m.kind==='dashboardCustomize'?'Personalizar página inicial':'Convidar colaborador'}
 function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Conta'} as const)[v]}
 function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Mais'} as const)[v]}
+function NavGlyph({view}:{view:View}){
+  if(view==='today') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.6 12 3.8l8.5 6.8v9.1a.8.8 0 0 1-.8.8H4.3a.8.8 0 0 1-.8-.8v-9.1Z"/><path d="M9 20.5v-6.2h6v6.2"/></svg>
+  if(view==='agenda') return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M7.5 3.5v4M16.5 3.5v4M3.5 9.5h17"/></svg>
+  if(view==='clients') return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.2" r="3.2"/><path d="M3.8 19.5c.5-4 2.3-6 5.2-6s4.7 2 5.2 6M15.2 10.6a3 3 0 1 0 0-5.7M16 13.8c2.5.3 3.9 2.2 4.2 5.7"/></svg>
+  if(view==='alerts') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 9.7a5.3 5.3 0 1 1 10.6 0c0 5.7 2.3 6.5 2.3 6.5H4.4s2.3-.8 2.3-6.5Z"/><path d="M9.7 19.1c.5.8 1.2 1.2 2.3 1.2s1.8-.4 2.3-1.2"/></svg>
+  if(view==='stock') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.1 12 3l8 4.1-8 4.1L4 7.1Z"/><path d="M4 7.1v9.8L12 21l8-4.1V7.1M12 11.2V21"/></svg>
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+}
 function navIcon(v:View){return ({today:'⌂',agenda:'□',clients:'♙',alerts:'!',stock:'▤',more:'•••'} as const)[v]}
 function initials(name:string){return name.split(/\s+/).slice(0,2).map(x=>x[0]?.toUpperCase()).join('')||'S'}
 function roleLabel(role:Role){return role==='owner'?'Proprietário':role==='manager'?'Gerente':'Colaborador'}
