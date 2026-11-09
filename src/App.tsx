@@ -364,7 +364,7 @@ export default function App(){
 
     <main className="content">
       {view==='today' && <TodayView manager={manager} widgets={dashboardWidgets} sales={salesSummary} goals={activeGoals} visits={visits} allAppointments={appointments} clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} onBusinessHub={tab=>setModal({kind:'businessHub',tab:tab||'dashboard'})} onCustomize={()=>setModal({kind:'dashboardCustomize'})} />}
-      {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} members={members} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
+      {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} members={members} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment',presetDate:agendaDate})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
@@ -1163,7 +1163,7 @@ function VisitForm({client,appointment,membership,serviceBy,onSaved}:{client:Cli
     if(appointment)await supabase.from('appointments').update({status:'completed'}).eq('id',appointment.id)
     onSaved('Visita e venda guardadas.')
   }
-  return <form className="formStack" onSubmit={submit}>
+  return <form className="formStack visitForm" onSubmit={submit}>
     <label>Data<input name="occurred_on" type="date" defaultValue={appointment?localISODate(new Date(appointment.starts_at)):todayISO()} required/></label>
     <label>Serviço<input name="service_label" defaultValue={service?.name||''} placeholder="Ex.: Coloração + corte"/></label>
     <label>Cor / fórmula técnica<textarea name="color_formula" placeholder="Ex.: 6/0 30g + 6/7 20g · Oxidante 6% 50g"/></label>
