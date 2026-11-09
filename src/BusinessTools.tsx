@@ -28,8 +28,10 @@ const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(
 const weeksSince=(iso:string)=>Math.max(0,Math.floor((Date.now()-new Date(`${iso}T12:00:00`).getTime())/(7*86400000)))
 const monthKey=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
 
+export type BusinessTab='dashboard'|'booking'|'team'|'dormant'|'loyalty'|'sales'
+
 export default function BusinessHub({
-  membership,members,clients,services,appointments,visits,onChanged
+  membership,members,clients,services,appointments,visits,onChanged,initialTab='dashboard'
 }:{
   membership:Member
   members:Member[]
@@ -38,8 +40,10 @@ export default function BusinessHub({
   appointments:Appointment[]
   visits:Visit[]
   onChanged:()=>void|Promise<void>
+  initialTab?:BusinessTab
 }){
-  const [tab,setTab]=useState<'dashboard'|'booking'|'team'|'dormant'|'loyalty'|'sales'>('dashboard')
+  const [tab,setTab]=useState<BusinessTab>(initialTab)
+  useEffect(()=>setTab(initialTab),[initialTab])
   const [loading,setLoading]=useState(true)
   const [settings,setSettings]=useState<Settings|null>(null)
   const [hours,setHours]=useState<WorkingHour[]>([])
