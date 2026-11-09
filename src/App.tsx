@@ -11,7 +11,7 @@ type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock'
 type Member = { id:string; salon_id:string; user_id:string|null; display_name:string; role:Role; active:boolean; calendar_color:string }
 type Service = { id:string; salon_id:string; name:string; duration_minutes:number; price:number; recurrence_weeks:number|null; image_url:string|null; active:boolean }
-type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null; dormant_after_weeks:number|null }
+type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; nif:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null; dormant_after_weeks:number|null }
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
 type Visit = { id:string; salon_id:string; client_id:string; appointment_id:string|null; employee_id:string; service_id:string|null; occurred_on:string; service_label:string|null; color_formula:string|null; treatment_products:string|null; notes:string|null; amount_paid:number }
 type Product = { id:string; salon_id:string; name:string; brand:string|null; barcode:string|null; unit:string; current_stock:number; min_stock:number; active:boolean }
@@ -678,8 +678,8 @@ function AgendaView({date,setDate,items,appointments,members,manager,mode,setMod
 }
 
 function ClientsView({clients,visits,query,setQuery,onNew,onOpen}:{clients:Client[];visits:Visit[];query:string;setQuery:(q:string)=>void;onNew:()=>void;onOpen:(c:Client)=>void}){
-  const arr=clients.filter(c=>`${c.name} ${c.phone||''}`.toLowerCase().includes(query.toLowerCase()))
-  return <><div className="searchRow"><input type="search" placeholder="Procurar cliente…" value={query} onChange={e=>setQuery(e.target.value)} /><button className="primary square" onClick={onNew}>+</button></div><div className="stack">{arr.map(c=>{const last=visits.filter(v=>v.client_id===c.id).sort((a,b)=>b.occurred_on.localeCompare(a.occurred_on))[0];return <button className="clientCard" key={c.id} onClick={()=>onOpen(c)}><div><strong>{c.name}</strong><span>{last?`Última visita: ${new Intl.DateTimeFormat(locale).format(new Date(`${last.occurred_on}T12:00:00`))} · ${last.service_label||'Serviço'}`:'Sem histórico'}</span></div><b>›</b></button>})}</div></>
+  const arr=clients.filter(c=>`${c.name} ${c.phone||''} ${c.nif||''}`.toLowerCase().includes(query.toLowerCase()))
+  return <><div className="searchRow"><input type="search" placeholder="Nome, telefone ou NIF…" value={query} onChange={e=>setQuery(e.target.value)} /><button className="primary square" onClick={onNew}>+</button></div><div className="stack">{arr.map(c=>{const last=visits.filter(v=>v.client_id===c.id).sort((a,b)=>b.occurred_on.localeCompare(a.occurred_on))[0];return <button className="clientCard" key={c.id} onClick={()=>onOpen(c)}><div><strong>{c.name}</strong><span>{last?`Última visita: ${new Intl.DateTimeFormat(locale).format(new Date(`${last.occurred_on}T12:00:00`))} · ${last.service_label||'Serviço'}`:'Sem histórico'}</span></div><b>›</b></button>})}</div></>
 }
 
 function AlertsView({retention,lowStock,onBook}:{retention:any[];lowStock:Product[];onBook:(c:Client)=>void}){
@@ -846,7 +846,7 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
   const [busy,setBusy]=useState(false)
   const [newClientOpen,setNewClientOpen]=useState(clients.length===0)
   const [creatingClient,setCreatingClient]=useState(false)
-  const [newClient,setNewClient]=useState({name:'',phone:'',email:''})
+  const [newClient,setNewClient]=useState({name:'',phone:'',email:'',nif:''})
 
   function changeClient(nextId:string){
     setClientId(nextId)
@@ -858,13 +858,16 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
 
   async function createClient(){
     const name=newClient.name.trim()
+    const nif=newClient.nif.replace(/\D/g,'')
     if(!name)return alert('Indica o nome do novo cliente.')
+    if(nif&&nif.length!==9)return alert('O NIF deve ter 9 dígitos.')
     setCreatingClient(true)
     const payload={
       salon_id:membership.salon_id,
       name,
       phone:newClient.phone.trim()||null,
       email:newClient.email.trim()||null,
+      nif:nif||null,
       birth_date:null,
       preferred_service_id:null,
       preferred_employee_id:null,
@@ -879,7 +882,7 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
     setLocalClients(current=>[...current,created].sort((a,b)=>a.name.localeCompare(b.name)))
     setClientId(created.id)
     setNewClientOpen(false)
-    setNewClient({name:'',phone:'',email:''})
+    setNewClient({name:'',phone:'',email:'',nif:''})
     if(!item){
       if(created.preferred_service_id)setServiceId(created.preferred_service_id)
       if(manager&&created.preferred_employee_id)setEmployeeId(created.preferred_employee_id)
@@ -966,7 +969,10 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
           <label>Nome<input value={newClient.name} onChange={e=>setNewClient(v=>({...v,name:e.target.value}))} placeholder="Nome do cliente" autoFocus/></label>
           <label>Telemóvel <span className="optionalLabel">opcional</span><input value={newClient.phone} onChange={e=>setNewClient(v=>({...v,phone:e.target.value}))} inputMode="tel" placeholder="9xx xxx xxx"/></label>
         </div>
-        <label>Email <span className="optionalLabel">opcional</span><input value={newClient.email} onChange={e=>setNewClient(v=>({...v,email:e.target.value}))} type="email" placeholder="email@exemplo.pt"/></label>
+        <div className="quickClientGrid">
+          <label>Email <span className="optionalLabel">opcional</span><input value={newClient.email} onChange={e=>setNewClient(v=>({...v,email:e.target.value}))} type="email" placeholder="email@exemplo.pt"/></label>
+          <label>NIF <span className="optionalLabel">opcional</span><input value={newClient.nif} onChange={e=>setNewClient(v=>({...v,nif:e.target.value.replace(/\D/g,'').slice(0,9)}))} inputMode="numeric" maxLength={9} placeholder="123456789"/></label>
+        </div>
         <button type="button" className="secondary full" disabled={creatingClient} onClick={()=>void createClient()}>{creatingClient?'A criar…':'Criar cliente e continuar'}</button>
       </div>}
     </div>
@@ -1008,6 +1014,8 @@ function ServiceForm({item,membership,onSaved}:{item?:Service;membership:Member;
   async function submit(e:FormEvent<HTMLFormElement>){
     e.preventDefault();setBusy(true)
     const fd=new FormData(e.currentTarget)
+    const nif=String(fd.get('nif')||'').replace(/\D/g,'')
+    if(nif&&nif.length!==9){setBusy(false);return alert('O NIF deve ter 9 dígitos.')}
     const payload={
       salon_id:membership.salon_id,
       name:String(fd.get('name')||'').trim(),
@@ -1069,6 +1077,7 @@ function ClientForm({item,prefill,membership,services,members,onSaved}:{item?:Cl
       name:String(fd.get('name')),
       phone:String(fd.get('phone')||'')||null,
       email:String(fd.get('email')||'')||null,
+      nif:nif||null,
       birth_date:String(fd.get('birth_date')||'')||null,
       preferred_service_id:String(fd.get('preferred_service_id')||'')||null,
       preferred_employee_id:String(fd.get('preferred_employee_id')||'')||null,
@@ -1088,6 +1097,7 @@ function ClientForm({item,prefill,membership,services,members,onSaved}:{item?:Cl
         <label>Telemóvel<input name="phone" type="tel" inputMode="tel" autoComplete="tel" defaultValue={item?.phone||prefill?.phone||''} placeholder="9xx xxx xxx"/></label>
         <label>Email <span className="optionalLabel">opcional</span><input name="email" type="email" autoComplete="email" defaultValue={item?.email||''} placeholder="email@exemplo.pt"/></label>
       </div>
+      <label>NIF <span className="optionalLabel">opcional</span><input name="nif" inputMode="numeric" pattern="[0-9]{9}" maxLength={9} defaultValue={item?.nif||''} placeholder="123456789"/></label>
       <label>Aniversário <span className="optionalLabel">opcional</span><input name="birth_date" type="date" defaultValue={item?.birth_date||''}/></label>
     </section>
 
@@ -1117,7 +1127,7 @@ function ClientDetail({client,appointments,visits,services,memberBy,onEdit,onBoo
   const nextAppointment=appointments.filter(a=>a.client_id===client.id && !['cancelled','completed','no_show'].includes(a.status) && new Date(a.starts_at).getTime()>=Date.now()).sort((a,b)=>a.starts_at.localeCompare(b.starts_at))[0]
   const nextService=nextAppointment?services.find(s=>s.id===nextAppointment.service_id):undefined
   const reminder=nextAppointment?appointmentReminderMessage(client.name,nextService?.name||'serviço',hhmm(nextAppointment.starts_at)):`Olá ${client.name},`
-  return <div><div className="clientHero"><div className="bigAvatar">{initials(client.name)}</div><div><h3>{client.name}</h3><span>{client.phone||'Sem telefone'}</span></div></div>{client.phone&&<><div className="contactGrid"><button className="secondary" onClick={()=>whatsApp(client.phone,reminder)}>WhatsApp</button><button className="secondary" onClick={()=>smsMessage(client.phone,reminder)}>SMS</button></div>{nextAppointment&&<p className="muted small" style={{marginTop:-4}}>Lembrete: {nextService?.name||'Serviço'} · {hhmm(nextAppointment.starts_at)}</p>}</>}<div className="quickActions"><button className="secondary" onClick={onBook}>+ Marcar</button><button className="secondary" onClick={onEdit}>Editar</button></div>{client.birth_date&&<InfoCard label="Aniversário">{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date(`${client.birth_date}T12:00:00`))}</InfoCard>}{client.preferred_employee_id&&<InfoCard label="Profissional habitual">{memberBy(client.preferred_employee_id)?.display_name||'Profissional'}</InfoCard>}{client.notes&&<InfoCard label="Observações">{client.notes}</InfoCard>}{last&&due&&<InfoCard label="Recorrência">{passed} semanas desde a última visita · habitual {due}</InfoCard>}<div className="sectionHead"><h3>Histórico</h3><button className="textButton" onClick={onVisit}>+ Visita</button></div>{history.length?history.map(v=><div className="historyItem" key={v.id}><div><strong>{new Intl.DateTimeFormat(locale).format(new Date(`${v.occurred_on}T12:00:00`))} · {v.service_label||'Serviço'}</strong>{v.color_formula&&<span><b>Cor/fórmula:</b> {v.color_formula}</span>}{v.treatment_products&&<span><b>Tratamento/produtos:</b> {v.treatment_products}</span>}{v.notes&&<span>{v.notes}</span>}<small>{memberBy(v.employee_id)?.display_name}</small></div><b>{money(v.amount_paid)}</b></div>):<Empty>Sem histórico ainda.</Empty>}</div>
+  return <div><div className="clientHero"><div className="bigAvatar">{initials(client.name)}</div><div><h3>{client.name}</h3><span>{client.phone||'Sem telefone'}</span></div></div>{client.phone&&<><div className="contactGrid"><button className="secondary" onClick={()=>whatsApp(client.phone,reminder)}>WhatsApp</button><button className="secondary" onClick={()=>smsMessage(client.phone,reminder)}>SMS</button></div>{nextAppointment&&<p className="muted small" style={{marginTop:-4}}>Lembrete: {nextService?.name||'Serviço'} · {hhmm(nextAppointment.starts_at)}</p>}</>}<div className="quickActions"><button className="secondary" onClick={onBook}>+ Marcar</button><button className="secondary" onClick={onEdit}>Editar</button></div>{client.nif&&<InfoCard label="NIF">{client.nif}</InfoCard>}{client.birth_date&&<InfoCard label="Aniversário">{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date(`${client.birth_date}T12:00:00`))}</InfoCard>}{client.preferred_employee_id&&<InfoCard label="Profissional habitual">{memberBy(client.preferred_employee_id)?.display_name||'Profissional'}</InfoCard>}{client.notes&&<InfoCard label="Observações">{client.notes}</InfoCard>}{last&&due&&<InfoCard label="Recorrência">{passed} semanas desde a última visita · habitual {due}</InfoCard>}<div className="sectionHead"><h3>Histórico</h3><button className="textButton" onClick={onVisit}>+ Visita</button></div>{history.length?history.map(v=><div className="historyItem" key={v.id}><div><strong>{new Intl.DateTimeFormat(locale).format(new Date(`${v.occurred_on}T12:00:00`))} · {v.service_label||'Serviço'}</strong>{v.color_formula&&<span><b>Cor/fórmula:</b> {v.color_formula}</span>}{v.treatment_products&&<span><b>Tratamento/produtos:</b> {v.treatment_products}</span>}{v.notes&&<span>{v.notes}</span>}<small>{memberBy(v.employee_id)?.display_name}</small></div><b>{money(v.amount_paid)}</b></div>):<Empty>Sem histórico ainda.</Empty>}</div>
 }
 
 function VisitForm({client,appointment,membership,serviceBy,onSaved}:{client:Client;appointment?:Appointment;membership:Member;serviceBy:(id:string|null)=>Service|undefined;onSaved:(m:string)=>void}){
