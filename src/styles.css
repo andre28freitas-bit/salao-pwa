@@ -1059,3 +1059,138 @@
   .quickClientGrid{grid-template-columns:1fr}
   .quickClientCreate{padding:11px}
 }
+
+
+/* Mobile viewport containment + compact forms */
+@media(max-width:520px){
+  html,body,#root,.appShell{max-width:100%;overflow-x:hidden}
+  .modalBackdrop{
+    width:100vw;
+    max-width:100vw;
+    padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));
+    align-items:flex-end;
+    overflow:hidden;
+  }
+  .modalCard{
+    box-sizing:border-box;
+    width:calc(100vw - 12px);
+    max-width:calc(100vw - 12px);
+    max-height:calc(100dvh - max(12px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom)));
+    margin:0 auto;
+    padding:12px 12px max(12px,env(safe-area-inset-bottom));
+    border-radius:22px 22px 16px 16px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    scrollbar-width:none;
+    overscroll-behavior:contain;
+  }
+  .modalCard::-webkit-scrollbar{display:none}
+  .modalCard *{min-width:0;max-width:100%}
+  .modalHead{
+    top:-12px;
+    margin:0 0 8px;
+    padding:12px 0 9px;
+  }
+  .modalHead h2{
+    font-size:20px;
+    line-height:1.15;
+    letter-spacing:-.02em;
+  }
+  .modalHead .iconButton{
+    width:38px;
+    height:38px;
+    flex:0 0 38px;
+  }
+
+  .formStack{
+    width:100%;
+    gap:9px;
+  }
+  .formStack label{
+    width:100%;
+    font-size:11.5px;
+    line-height:1.2;
+  }
+  .formStack input,
+  .formStack select,
+  .formStack textarea{
+    box-sizing:border-box;
+    display:block;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    margin-top:5px;
+    font-size:16px;
+    border-radius:11px;
+  }
+  .formStack input,
+  .formStack select{
+    min-height:43px;
+    height:43px;
+    padding:8px 10px;
+  }
+  .formStack textarea{
+    min-height:62px;
+    max-height:105px;
+    padding:9px 10px;
+    resize:vertical;
+  }
+  .grid2{
+    width:100%;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:8px;
+  }
+
+  .visitForm{gap:9px}
+  .visitForm textarea[name="color_formula"]{min-height:66px}
+  .visitForm textarea[name="notes"]{min-height:68px}
+  .visitForm input[name="amount_paid"]{font-weight:700}
+  .visitForm .primary{
+    min-height:48px;
+    font-size:15px;
+    margin-top:2px;
+  }
+
+  .appointmentClientBlock,
+  .quickClientCreate,
+  .quickClientGrid,
+  .appointmentDateTime{width:100%}
+  .appointmentClientBlock>select{font-size:16px;min-height:43px;padding:8px 10px}
+  .quickClientCreate{padding:10px;gap:8px}
+  .quickClientGrid{grid-template-columns:1fr}
+  .inlineCreateButton{font-size:10.5px}
+
+  .agendaPeriodBar,
+  .agendaViewSwitch,
+  .agendaPeopleSwitch,
+  .agendaTeamLegend,
+  .weekAgenda,
+  .monthCalendar,
+  .timeline{max-width:100%;overflow-x:hidden}
+  .bookingCard,.weekBooking,.weekDayCard{max-width:100%}
+  .bookingMain{min-width:0}
+  .bookingMain strong,.bookingMain span,.bookingMain small{
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .agendaTeamLegend{
+    overflow-x:auto;
+    flex-wrap:nowrap;
+    padding-bottom:2px;
+    scrollbar-width:none;
+  }
+  .agendaTeamLegend::-webkit-scrollbar{display:none}
+  .agendaTeamLegend>span{white-space:nowrap;flex:0 0 auto}
+}
+
+@media(max-width:360px){
+  .modalCard{
+    width:calc(100vw - 8px);
+    max-width:calc(100vw - 8px);
+    padding-left:10px;
+    padding-right:10px;
+  }
+  .grid2{gap:6px}
+  .formStack input,.formStack select{padding-left:8px;padding-right:8px}
+  .modalHead h2{font-size:18px}
+}
