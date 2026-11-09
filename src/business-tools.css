@@ -61,3 +61,16 @@
   .memberColorChoices{justify-content:flex-start}
   .memberColorChoice,.customColorChoice{width:32px;height:32px}
 }
+
+.teamManagementActions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.teamManagementActions .secondary{
+  min-width:0;
+  width:100%;
+}
+@media(max-width:620px){
+  .teamManagementActions{grid-template-columns:1fr}
+}
