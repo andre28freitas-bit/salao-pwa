@@ -65,7 +65,7 @@ export default function BusinessHub({
       supabase.from('member_working_periods').select('*').eq('salon_id',sid).order('weekday').order('sort_order'),
       supabase.from('member_schedule_blocks').select('*').eq('salon_id',sid).gte('ends_at',new Date().toISOString()).order('starts_at'),
       supabase.from('loyalty_redemptions').select('*').eq('salon_id',sid).order('redeemed_at',{ascending:false}),
-      supabase.from('sales').select('*').eq('salon_id',sid).order('occurred_at',{ascending:false}).limit(500),
+      supabase.from('sales').select('*').eq('salon_id',sid).order('occurred_at',{ascending:false}).limit(5000),
       supabase.from('business_goals').select('*').eq('salon_id',sid).eq('active',true).order('period_end')
     ])
     for(const q of [st,p,b,r,s,g]) if(q.error) console.warn(q.error.message)
