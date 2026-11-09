@@ -342,6 +342,8 @@ export default function App(){
 
     <AppMenu
       open={menuOpen}
+      logoUrl={brandSettings.logo_url}
+      salonName={salon?.name||'Salão'}
       manager={manager}
       businessOpen={businessMenuOpen}
       setBusinessOpen={setBusinessMenuOpen}
@@ -465,7 +467,7 @@ function DesktopSidebar({logoUrl,salonName,membership,view,manager,businessOpen,
   </aside>
 }
 
-function AppMenu({open,manager,businessOpen,setBusinessOpen,onClose,onView,onBusiness,onWebsite,onSiteSettings,onServices,onCustomize}:{open:boolean;manager:boolean;businessOpen:boolean;setBusinessOpen:(v:boolean)=>void;onClose:()=>void;onView:(v:View)=>void;onBusiness:(tab:BusinessTab)=>void;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onCustomize:()=>void}){
+function AppMenu({open,logoUrl,salonName,manager,businessOpen,setBusinessOpen,onClose,onView,onBusiness,onWebsite,onSiteSettings,onServices,onCustomize}:{open:boolean;logoUrl:string|null;salonName:string;manager:boolean;businessOpen:boolean;setBusinessOpen:(v:boolean)=>void;onClose:()=>void;onView:(v:View)=>void;onBusiness:(tab:BusinessTab)=>void;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onCustomize:()=>void}){
   if(!open) return null
   const navItems:[View,string,string][]=[
     ['today','Hoje','Resumo e prioridades do dia'],
@@ -485,6 +487,10 @@ function AppMenu({open,manager,businessOpen,setBusinessOpen,onClose,onView,onBus
   ]
   return <div className="appMenuBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
     <aside className="appMenuPanel">
+      <div className="appMenuBrand">
+        <div className="appMenuBrandLogo">{logoUrl?<img src={logoUrl} alt={salonName}/>:<span>{initials(salonName)}</span>}</div>
+        <div><strong>{salonName}</strong><span>Gestão do negócio</span></div>
+      </div>
       <div className="appMenuHead"><strong>Navegação</strong><button className="iconButton" onClick={onClose}>×</button></div>
       <div className="appMenuList">
         {navItems.map(([id,label,desc])=><button key={id} className="appMenuItem" onClick={()=>onView(id)}><div><strong>{label}</strong><span>{desc}</span></div><b>›</b></button>)}
