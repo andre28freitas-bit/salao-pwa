@@ -392,23 +392,89 @@ function Onboarding({onDone,onToast}:{onDone:()=>void;onToast:(m:string)=>void})
   return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><h1>Primeira configuração</h1><div className="segmented"><button className={tab==='create'?'active':''} onClick={()=>setTab('create')}>Criar salão</button><button className={tab==='join'?'active':''} onClick={()=>setTab('join')}>Tenho convite</button></div><form onSubmit={submit} className="formStack"><label>{tab==='create'?'Nome do salão':'Código do convite'}<input name="value" required placeholder={tab==='create'?'Ex.: Studio Maria':'Ex.: A4F91C2D'} /></label><button className="primary full" disabled={busy}>{tab==='create'?'Criar e continuar':'Entrar no salão'}</button></form></div></div>
 }
 
-function TodayView({clients,appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus,onBookingSchedule}:{clients:Client[];appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onBookingSchedule:(request:BookingRequest)=>void}){
-  return <><div className="dateStrip"><div><div className="muted cap">{dateLabel(todayISO()).split(',')[0]}</div><strong>{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date())}</strong></div><button className="primary small" onClick={onNew}>+ Marcação</button></div>
-  <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Pedidos" value={bookingRequests.filter(r=>r.status==='new').length} sub="online"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/></div>
-  <Section title={`Pedidos online (${bookingRequests.length})`}>
-    {bookingRequests.length?bookingRequests.map(r=>{const targetPhone=comparablePhone(r.phone);const linked=(r.client_id?clients.find(c=>c.id===r.client_id):undefined)||clients.find(c=>targetPhone&&comparablePhone(c.phone)===targetPhone);return <BookingRequestCard key={r.id} request={r} client={linked} onStatus={onBookingStatus} onSchedule={()=>onBookingSchedule(r)} onClient={()=>linked&&onClient(linked)}/> }):<Empty>Sem pedidos de marcação pendentes.</Empty>}
-  </Section>
-  <Section title={`Confirmar amanhã (${tomorrowAppointments.length})`}>
-    {tomorrowAppointments.length?tomorrowAppointments.map(a=>{
-      const client=clientBy(a.client_id), service=serviceBy(a.service_id), member=memberBy(a.employee_id)
-      return <TomorrowConfirmationCard key={a.id} a={a} c={client} s={service} m={member} onClient={()=>client&&onClient(client)} />
-    }):<Empty>Sem marcações para confirmar amanhã.</Empty>}
-  </Section>
-  <Section title={`Aniversários — próximos 7 dias (${upcomingBirthdays.length})`}>
-    {upcomingBirthdays.length?upcomingBirthdays.map(item=><BirthdayCard key={item.client.id} client={item.client} date={item.date} daysUntil={item.daysUntil} onClient={()=>onClient(item.client)} />):<Empty>Sem aniversários nos próximos 7 dias.</Empty>}
-  </Section>
-  <Section title="Marcações de hoje">{appointments.length?appointments.slice(0,5).map(a=><AppointmentCard key={a.id} a={a} c={clientBy(a.client_id)} s={serviceBy(a.service_id)} m={memberBy(a.employee_id)} salonName={salonName} onClient={()=>clientBy(a.client_id)&&onClient(clientBy(a.client_id)!)} />):<Empty>Sem marcações para hoje.</Empty>}</Section>
-  <Section title="Clientes a recuperar">{retention.length?retention.slice(0,4).map((r:any)=><RetentionCard key={r.client.id} r={r} onBook={()=>onBook(r.client)}/>):<Empty>Nenhuma cliente em atraso.</Empty>}</Section></>
+function AppMenu({open,manager,businessOpen,setBusinessOpen,onClose,onView,onBusiness,onWebsite,onSiteSettings,onServices,onCustomize}:{open:boolean;manager:boolean;businessOpen:boolean;setBusinessOpen:(v:boolean)=>void;onClose:()=>void;onView:(v:View)=>void;onBusiness:(tab:BusinessTab)=>void;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onCustomize:()=>void}){
+  if(!open) return null
+  const navItems:[View,string,string][]=[
+    ['today','Hoje','Resumo e prioridades do dia'],
+    ['agenda','Agenda','Marcações e disponibilidade'],
+    ['clients','Clientes','CRM, histórico e preferências'],
+    ['alerts','Alertas','Retenção e stock'],
+    ['stock','Stock','Produtos e movimentos']
+  ]
+  const businessItems:{tab:BusinessTab;label:string}[]=[
+    {tab:'dashboard',label:'Dashboard'},
+    {tab:'booking',label:'Marcações'},
+    {tab:'team',label:'Equipa e horários'},
+    {tab:'dormant',label:'Clientes adormecidos'},
+    {tab:'loyalty',label:'Fidelização'},
+    {tab:'sales',label:'Vendas e comissões'}
+  ]
+  return <div className="appMenuBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
+    <aside className="appMenuPanel">
+      <div className="appMenuHead"><strong>Navegação</strong><button className="iconButton" onClick={onClose}>×</button></div>
+      <div className="appMenuList">
+        {navItems.map(([id,label,desc])=><button key={id} className="appMenuItem" onClick={()=>onView(id)}><div><strong>{label}</strong><span>{desc}</span></div><b>›</b></button>)}
+        {manager&&<div className="appMenuGroup">
+          <button className={businessOpen?'appMenuItem groupOpen':'appMenuItem'} onClick={()=>setBusinessOpen(!businessOpen)}><div><strong>Gestão do negócio</strong><span>Dashboard, equipa, fidelização e vendas</span></div><b>{businessOpen?'⌃':'⌄'}</b></button>
+          {businessOpen&&<div className="appMenuSub">{businessItems.map(item=><button key={item.tab} onClick={()=>onBusiness(item.tab)}>{item.label}<span>›</span></button>)}</div>}
+        </div>}
+        <button className="appMenuItem" onClick={onCustomize}><div><strong>Personalizar página inicial</strong><span>Escolher e ordenar widgets</span></div><b>›</b></button>
+        {manager&&<button className="appMenuItem" onClick={onServices}><div><strong>Serviços</strong><span>Preços, duração e imagens</span></div><b>›</b></button>}
+        {manager&&<button className="appMenuItem" onClick={onSiteSettings}><div><strong>Website e contactos</strong><span>Identidade e contactos públicos</span></div><b>›</b></button>}
+        <button className="appMenuItem" onClick={onWebsite}><div><strong>Ver website</strong><span>Abrir a página pública</span></div><b>↗</b></button>
+      </div>
+    </aside>
+  </div>
+}
+
+function TodayView({manager,widgets,monthSales,clients,appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus,onBookingSchedule,onBusinessHub,onCustomize}:{manager:boolean;widgets:DashboardWidget[];monthSales:SaleSummary[];clients:Client[];appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onBookingSchedule:(request:BookingRequest)=>void;onBusinessHub:()=>void;onCustomize:()=>void}){
+  const revenue=monthSales.reduce((n,s)=>n+Number(s.total_amount||0),0)
+  const ticket=monthSales.length?revenue/monthSales.length:0
+  const ordered=widgets.filter(id=>!(dashboardWidgetOptions.find(x=>x.id===id)?.managerOnly&&!manager))
+
+  function renderWidget(id:DashboardWidget){
+    if(id==='summary') return <div className="dashboardWidget dashboardWidgetSummary" key={id}>
+      <div className="dashboardWidgetHead"><div><span>Hoje</span><h2>Resumo do dia</h2></div><button className="textButton dashboardEdit" onClick={onCustomize}>Personalizar</button></div>
+      <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Pedidos" value={bookingRequests.filter(r=>r.status==='new').length} sub="online"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/></div>
+    </div>
+
+    if(id==='business'&&manager) return <button className="businessShortcut" key={id} onClick={onBusinessHub}>
+      <div className="businessShortcutIcon">◫</div><div><span>GESTÃO DO NEGÓCIO</span><strong>Dashboard, vendas, fidelização e equipa</strong><small>Gerir operação e acompanhar resultados</small></div><b>›</b>
+    </button>
+
+    if(id==='sales'&&manager) return <section className="dashboardWidget" key={id}>
+      <div className="dashboardWidgetHead"><div><span>Este mês</span><h2>Vendas</h2></div><button className="mini" onClick={onBusinessHub}>Abrir gestão</button></div>
+      <div className="dashboardSalesGrid"><div><span>Faturação registada</span><strong>{money(revenue)}</strong></div><div><span>Ticket médio</span><strong>{money(ticket)}</strong></div><div><span>Vendas</span><strong>{monthSales.length}</strong></div></div>
+    </section>
+
+    if(id==='requests') return <Section key={id} title={`Pedidos online (${bookingRequests.length})`}>
+      {bookingRequests.length?bookingRequests.map(r=>{const targetPhone=comparablePhone(r.phone);const linked=(r.client_id?clients.find(c=>c.id===r.client_id):undefined)||clients.find(c=>targetPhone&&comparablePhone(c.phone)===targetPhone);return <BookingRequestCard key={r.id} request={r} client={linked} onStatus={onBookingStatus} onSchedule={()=>onBookingSchedule(r)} onClient={()=>linked&&onClient(linked)}/> }):<Empty>Sem pedidos de marcação pendentes.</Empty>}
+    </Section>
+
+    if(id==='tomorrow') return <Section key={id} title={`Confirmar amanhã (${tomorrowAppointments.length})`}>
+      {tomorrowAppointments.length?tomorrowAppointments.map(a=>{const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id);return <TomorrowConfirmationCard key={a.id} a={a} c={client} s={service} m={member} onClient={()=>client&&onClient(client)} />}):<Empty>Sem marcações para confirmar amanhã.</Empty>}
+    </Section>
+
+    if(id==='birthdays') return <Section key={id} title={`Aniversários — próximos 7 dias (${upcomingBirthdays.length})`}>
+      {upcomingBirthdays.length?upcomingBirthdays.map(item=><BirthdayCard key={item.client.id} client={item.client} date={item.date} daysUntil={item.daysUntil} onClient={()=>onClient(item.client)} />):<Empty>Sem aniversários nos próximos 7 dias.</Empty>}
+    </Section>
+
+    if(id==='appointments') return <Section key={id} title="Marcações de hoje">{appointments.length?appointments.slice(0,6).map(a=><AppointmentCard key={a.id} a={a} c={clientBy(a.client_id)} s={serviceBy(a.service_id)} m={memberBy(a.employee_id)} salonName={salonName} onClient={()=>clientBy(a.client_id)&&onClient(clientBy(a.client_id)!)} />):<Empty>Sem marcações para hoje.</Empty>}</Section>
+
+    if(id==='recovery') return <Section key={id} title="Clientes a recuperar">{retention.length?retention.slice(0,5).map((r:any)=><RetentionCard key={r.client.id} r={r} onBook={()=>onBook(r.client)}/>):<Empty>Nenhuma cliente em atraso.</Empty>}</Section>
+
+    if(id==='stock'&&manager) return <section className="dashboardWidget" key={id}>
+      <div className="dashboardWidgetHead"><div><span>Inventário</span><h2>Stock baixo</h2></div></div>
+      {lowStock.length?<div className="dashboardCompactList">{lowStock.slice(0,5).map(p=><div key={p.id}><strong>{p.name}</strong><span>{p.current_stock} {p.unit} · mínimo {p.min_stock}</span></div>)}</div>:<Empty>Sem produtos abaixo do stock mínimo.</Empty>}
+    </section>
+    return null
+  }
+
+  return <>
+    <div className="dateStrip dashboardDateStrip"><div><div className="muted cap">{dateLabel(todayISO()).split(',')[0]}</div><strong>{new Intl.DateTimeFormat(locale,{day:'2-digit',month:'long'}).format(new Date())}</strong></div><button className="primary small" onClick={onNew}>+ Marcação</button></div>
+    <div className="dashboardCanvas">{ordered.map(renderWidget)}</div>
+    {!ordered.length&&<div className="dashboardEmpty"><strong>A tua página inicial está vazia.</strong><span>Escolhe os widgets que queres acompanhar.</span><button className="primary" onClick={onCustomize}>Personalizar dashboard</button></div>}
+  </>
 }
 
 function AgendaView({date,setDate,items,appointments,manager,mode,setMode,membership,clientBy,serviceBy,memberBy,onNew,onOpen,onICS}:{date:string;setDate:(s:string)=>void;items:Appointment[];appointments:Appointment[];manager:boolean;mode:'mine'|'team';setMode:(m:'mine'|'team')=>void;membership:Member;clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;onNew:()=>void;onOpen:(a:Appointment)=>void;onICS:(a:Appointment)=>void}){
