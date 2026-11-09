@@ -18,14 +18,16 @@ type Product = { id:string; salon_id:string; name:string; brand:string|null; bar
 type BookingRequest = { id:string; salon_id:string; client_id:string|null; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'|'no_preference'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
 type Salon = { id:string; name:string; timezone:string }
 type BusinessSettings = { salon_id:string; dormant_after_weeks:number }
-type DashboardWidget = 'summary'|'business'|'sales'|'appointments'|'requests'|'tomorrow'|'recovery'|'birthdays'|'stock'
+type DashboardWidget = 'summary'|'business'|'sales'|'goals'|'appointments'|'requests'|'tomorrow'|'recovery'|'birthdays'|'stock'
 type SaleSummary = { id:string; occurred_at:string; total_amount:number }
+type GoalSummary = { id:string; goal_type:'revenue'|'services'|'appointments'; title:string|null; target_value:number; period_start:string; period_end:string; active:boolean }
 
 const defaultDashboardWidgets:DashboardWidget[]=['summary','business','appointments','requests','tomorrow','recovery','birthdays']
 const dashboardWidgetOptions:{id:DashboardWidget;label:string;description:string;managerOnly?:boolean}[]=[
   {id:'summary',label:'Resumo do dia',description:'Marcações, pedidos e confirmações.'},
   {id:'business',label:'Gestão do negócio',description:'Atalho para dashboard, vendas e gestão.',managerOnly:true},
   {id:'sales',label:'Vendas do mês',description:'Faturação registada e ticket médio.',managerOnly:true},
+  {id:'goals',label:'Objetivos',description:'Acompanhar o progresso das metas do negócio.',managerOnly:true},
   {id:'appointments',label:'Marcações de hoje',description:'Próximas marcações do dia.'},
   {id:'requests',label:'Pedidos online',description:'Pedidos que aguardam tratamento.'},
   {id:'tomorrow',label:'Confirmar amanhã',description:'Marcações de amanhã a confirmar.'},
@@ -128,6 +130,7 @@ export default function App(){
   const [businessSettings,setBusinessSettings]=useState<BusinessSettings|null>(null)
   const [dashboardWidgets,setDashboardWidgets]=useState<DashboardWidget[]>(defaultDashboardWidgets)
   const [monthSales,setMonthSales]=useState<SaleSummary[]>([])
+  const [activeGoals,setActiveGoals]=useState<GoalSummary[]>([])
   const [menuOpen,setMenuOpen]=useState(false)
   const [businessMenuOpen,setBusinessMenuOpen]=useState(false)
   const [view,setView]=useState<View>('today')
@@ -172,7 +175,7 @@ export default function App(){
     if(!membership) return
     const salonId=membership.salon_id
     const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString()
-    const [m,s,c,a,v,p,br,bs,dp,sa]=await Promise.all([
+    const [m,s,c,a,v,p,br,bs,dp,sa,go]=await Promise.all([
       supabase.from('salon_members').select('*').eq('salon_id',salonId).eq('active',true).order('display_name'),
       supabase.from('services').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
       supabase.from('clients').select('*').eq('salon_id',salonId).order('name'),
@@ -182,14 +185,16 @@ export default function App(){
       supabase.from('booking_requests').select('*').eq('salon_id',salonId).in('status',['new','contacted']).order('created_at',{ascending:false}),
       supabase.from('salon_business_settings').select('salon_id,dormant_after_weeks').eq('salon_id',salonId).maybeSingle(),
       supabase.from('dashboard_preferences').select('widgets').eq('salon_id',salonId).eq('member_id',membership.id).maybeSingle(),
-      supabase.from('sales').select('id,occurred_at,total_amount').eq('salon_id',salonId).gte('occurred_at',monthStart).order('occurred_at',{ascending:false})
+      supabase.from('sales').select('id,occurred_at,total_amount').eq('salon_id',salonId).gte('occurred_at',monthStart).order('occurred_at',{ascending:false}),
+      supabase.from('business_goals').select('id,goal_type,title,target_value,period_start,period_end,active').eq('salon_id',salonId).eq('active',true).order('period_end')
     ])
-    for(const result of [m,s,c,a,v,p,br,bs,dp,sa]) if(result.error) showToast(result.error.message)
+    for(const result of [m,s,c,a,v,p,br,bs,dp,sa,go]) if(result.error) showToast(result.error.message)
     setMembers((m.data||[]) as Member[]); setServices((s.data||[]) as Service[]); setClients((c.data||[]) as Client[])
     setAppointments((a.data||[]) as Appointment[]); setVisits((v.data||[]) as Visit[]); setProducts((p.data||[]) as Product[]); setBookingRequests((br.data||[]) as BookingRequest[]); setBusinessSettings((bs.data as BusinessSettings)||null)
     const prefWidgets=Array.isArray(dp.data?.widgets)?dp.data.widgets.filter((x:any)=>dashboardWidgetOptions.some(w=>w.id===x)) as DashboardWidget[]:[]
     setDashboardWidgets(prefWidgets.length?prefWidgets:defaultDashboardWidgets)
     setMonthSales((sa.data||[]) as SaleSummary[])
+    setActiveGoals((go.data||[]) as GoalSummary[])
   }
 
   function subscribeRealtime(){
@@ -201,6 +206,7 @@ export default function App(){
       .on('postgres_changes',{event:'*',schema:'public',table:'products',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'booking_requests',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'sales',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
+      .on('postgres_changes',{event:'*',schema:'public',table:'business_goals',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .subscribe()
     return ()=>{supabase.removeChannel(channel)}
   }
@@ -329,7 +335,7 @@ export default function App(){
     />
 
     <main className="content">
-      {view==='today' && <TodayView manager={manager} widgets={dashboardWidgets} monthSales={monthSales} clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} onBusinessHub={()=>setModal({kind:'businessHub',tab:'dashboard'})} onCustomize={()=>setModal({kind:'dashboardCustomize'})} />}
+      {view==='today' && <TodayView manager={manager} widgets={dashboardWidgets} monthSales={monthSales} goals={activeGoals} visits={visits} allAppointments={appointments} clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} onBusinessHub={()=>setModal({kind:'businessHub',tab:'dashboard'})} onCustomize={()=>setModal({kind:'dashboardCustomize'})} />}
       {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
@@ -407,7 +413,8 @@ function AppMenu({open,manager,businessOpen,setBusinessOpen,onClose,onView,onBus
     {tab:'team',label:'Equipa e horários'},
     {tab:'dormant',label:'Clientes adormecidos'},
     {tab:'loyalty',label:'Fidelização'},
-    {tab:'sales',label:'Vendas e comissões'}
+    {tab:'sales',label:'Vendas e comissões'},
+    {tab:'goals',label:'Objetivos'}
   ]
   return <div className="appMenuBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
     <aside className="appMenuPanel">
@@ -427,7 +434,7 @@ function AppMenu({open,manager,businessOpen,setBusinessOpen,onClose,onView,onBus
   </div>
 }
 
-function TodayView({manager,widgets,monthSales,clients,appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus,onBookingSchedule,onBusinessHub,onCustomize}:{manager:boolean;widgets:DashboardWidget[];monthSales:SaleSummary[];clients:Client[];appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onBookingSchedule:(request:BookingRequest)=>void;onBusinessHub:()=>void;onCustomize:()=>void}){
+function TodayView({manager,widgets,monthSales,goals,visits,allAppointments,clients,appointments,tomorrowAppointments,bookingRequests,upcomingBirthdays,retention,lowStock,clientBy,serviceBy,memberBy,salonName,onNew,onClient,onBook,onBookingStatus,onBookingSchedule,onBusinessHub,onCustomize}:{manager:boolean;widgets:DashboardWidget[];monthSales:SaleSummary[];goals:GoalSummary[];visits:Visit[];allAppointments:Appointment[];clients:Client[];appointments:Appointment[];tomorrowAppointments:Appointment[];bookingRequests:BookingRequest[];upcomingBirthdays:{client:Client;date:Date;daysUntil:number}[];retention:any[];lowStock:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;salonName:string;onNew:()=>void;onClient:(c:Client)=>void;onBook:(c:Client)=>void;onBookingStatus:(id:string,status:'contacted'|'booked'|'closed')=>void;onBookingSchedule:(request:BookingRequest)=>void;onBusinessHub:()=>void;onCustomize:()=>void}){
   const revenue=monthSales.reduce((n,s)=>n+Number(s.total_amount||0),0)
   const ticket=monthSales.length?revenue/monthSales.length:0
   const ordered=widgets.filter(id=>!(dashboardWidgetOptions.find(x=>x.id===id)?.managerOnly&&!manager))
@@ -445,6 +452,20 @@ function TodayView({manager,widgets,monthSales,clients,appointments,tomorrowAppo
     if(id==='sales'&&manager) return <section className="dashboardWidget" key={id}>
       <div className="dashboardWidgetHead"><div><span>Este mês</span><h2>Vendas</h2></div><button className="mini" onClick={onBusinessHub}>Abrir gestão</button></div>
       <div className="dashboardSalesGrid"><div><span>Faturação registada</span><strong>{money(revenue)}</strong></div><div><span>Ticket médio</span><strong>{money(ticket)}</strong></div><div><span>Vendas</span><strong>{monthSales.length}</strong></div></div>
+    </section>
+
+    if(id==='goals'&&manager) return <section className="dashboardWidget dashboardGoalsWidget" key={id}>
+      <div className="dashboardWidgetHead"><div><span>Performance</span><h2>Objetivos</h2></div><button className="mini" onClick={onBusinessHub}>Gerir</button></div>
+      {goals.length?<div className="homeGoalList">{goals.slice(0,3).map(goal=>{
+        const current=goal.goal_type==='revenue'
+          ? monthSales.filter(s=>localISODate(new Date(s.occurred_at))>=goal.period_start&&localISODate(new Date(s.occurred_at))<=goal.period_end).reduce((n,s)=>n+Number(s.total_amount||0),0)
+          : goal.goal_type==='services'
+            ? visits.filter(v=>v.occurred_on>=goal.period_start&&v.occurred_on<=goal.period_end).length
+            : allAppointments.filter(a=>a.status==='completed'&&localISODate(new Date(a.starts_at))>=goal.period_start&&localISODate(new Date(a.starts_at))<=goal.period_end).length
+        const pct=Math.min(100,Math.round(current/Number(goal.target_value)*100))
+        const label=goal.title||(goal.goal_type==='revenue'?'Faturação':goal.goal_type==='services'?'Serviços':'Marcações')
+        return <div className="homeGoalRow" key={goal.id}><div><strong>{label}</strong><span>{goal.goal_type==='revenue'?money(current):current} de {goal.goal_type==='revenue'?money(goal.target_value):Number(goal.target_value)}</span></div><div className="homeGoalProgress"><i style={{width:`${pct}%`}}/></div><b>{pct}%</b></div>
+      })}</div>:<div className="empty">Ainda não existem objetivos ativos.</div>}
     </section>
 
     if(id==='requests') return <Section key={id} title={`Pedidos online (${bookingRequests.length})`}>
@@ -763,23 +784,26 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
     const end=new Date(start.getTime()+Number(service?.duration_minutes||45)*60000)
     const targetEmployee=manager?employeeId:membership.id
     const weekday=start.getDay()
-    const [{data:workingHour,error:hoursError},{data:scheduleBlocks,error:blocksError}]=await Promise.all([
-      supabase.from('member_working_hours').select('enabled,start_time,end_time').eq('member_id',targetEmployee).eq('weekday',weekday).maybeSingle(),
+    const [{data:workingPeriods,error:hoursError},{data:scheduleBlocks,error:blocksError}]=await Promise.all([
+      supabase.from('member_working_periods').select('weekday,start_time,end_time').eq('member_id',targetEmployee).order('weekday').order('sort_order'),
       supabase.from('member_schedule_blocks').select('id,starts_at,ends_at,reason').eq('member_id',targetEmployee).lt('starts_at',end.toISOString()).gt('ends_at',start.toISOString()).limit(1)
     ])
     if(hoursError||blocksError){
       setBusy(false)
       return alert((hoursError||blocksError)?.message||'Não foi possível validar o horário.')
     }
-    if(workingHour){
-      if(!workingHour.enabled){
+    if(workingPeriods?.length){
+      const dayPeriods=workingPeriods.filter(p=>p.weekday===weekday)
+      if(!dayPeriods.length){
         setBusy(false)
         return alert('Este profissional está de folga neste dia.')
       }
       const endTime=`${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')}`
-      if(time<workingHour.start_time.slice(0,5)||endTime>workingHour.end_time.slice(0,5)){
+      const insidePeriod=dayPeriods.some(p=>time>=p.start_time.slice(0,5)&&endTime<=p.end_time.slice(0,5))
+      if(!insidePeriod){
         setBusy(false)
-        return alert(`Esta marcação fica fora do horário deste profissional (${workingHour.start_time.slice(0,5)}–${workingHour.end_time.slice(0,5)}).`)
+        const availability=dayPeriods.map(p=>`${p.start_time.slice(0,5)}–${p.end_time.slice(0,5)}`).join(' / ')
+        return alert(`Esta marcação fica fora dos períodos disponíveis deste profissional (${availability}).`)
       }
     }
     if(scheduleBlocks?.length){
