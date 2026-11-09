@@ -5,17 +5,19 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import { createWorker } from 'tesseract.js'
 import LandingPage from './LandingPage'
 import BarberDemo from './BarberDemo'
+import BusinessHub from './BusinessTools'
 
 type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
 type Member = { id:string; salon_id:string; user_id:string|null; display_name:string; role:Role; active:boolean }
 type Service = { id:string; salon_id:string; name:string; duration_minutes:number; price:number; recurrence_weeks:number|null; image_url:string|null; active:boolean }
-type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null }
+type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null; dormant_after_weeks:number|null }
 type Appointment = { id:string; salon_id:string; client_id:string; service_id:string|null; employee_id:string; starts_at:string; ends_at:string; status:'pending'|'confirmed'|'completed'|'cancelled'|'no_show'; notes:string|null }
 type Visit = { id:string; salon_id:string; client_id:string; appointment_id:string|null; employee_id:string; service_id:string|null; occurred_on:string; service_label:string|null; color_formula:string|null; treatment_products:string|null; notes:string|null; amount_paid:number }
 type Product = { id:string; salon_id:string; name:string; brand:string|null; barcode:string|null; unit:string; current_stock:number; min_stock:number; active:boolean }
 type BookingRequest = { id:string; salon_id:string; client_id:string|null; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'|'no_preference'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
 type Salon = { id:string; name:string; timezone:string }
+type BusinessSettings = { salon_id:string; dormant_after_weeks:number }
 
 type Modal =
   | { kind:'appointment'; item?:Appointment; presetClient?:string; presetService?:string; presetDate?:string; presetTime?:string; bookingRequestId?:string }
@@ -29,6 +31,7 @@ type Modal =
   | { kind:'services' }
   | { kind:'service'; item?:Service }
   | { kind:'siteSettings' }
+  | { kind:'businessHub' }
   | null
 
 const locale = 'pt-PT'
@@ -106,6 +109,7 @@ export default function App(){
   const [visits,setVisits]=useState<Visit[]>([])
   const [products,setProducts]=useState<Product[]>([])
   const [bookingRequests,setBookingRequests]=useState<BookingRequest[]>([])
+  const [businessSettings,setBusinessSettings]=useState<BusinessSettings|null>(null)
   const [view,setView]=useState<View>('today')
   const [agendaDate,setAgendaDate]=useState(todayISO())
   const [agendaMode,setAgendaMode]=useState<'mine'|'team'>('mine')
@@ -147,18 +151,19 @@ export default function App(){
   async function loadData(){
     if(!membership) return
     const salonId=membership.salon_id
-    const [m,s,c,a,v,p,br]=await Promise.all([
+    const [m,s,c,a,v,p,br,bs]=await Promise.all([
       supabase.from('salon_members').select('*').eq('salon_id',salonId).eq('active',true).order('display_name'),
       supabase.from('services').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
       supabase.from('clients').select('*').eq('salon_id',salonId).order('name'),
       supabase.from('appointments').select('*').eq('salon_id',salonId).order('starts_at'),
       supabase.from('visits').select('*').eq('salon_id',salonId).order('occurred_on',{ascending:false}),
       supabase.from('products').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
-      supabase.from('booking_requests').select('*').eq('salon_id',salonId).in('status',['new','contacted']).order('created_at',{ascending:false})
+      supabase.from('booking_requests').select('*').eq('salon_id',salonId).in('status',['new','contacted']).order('created_at',{ascending:false}),
+      supabase.from('salon_business_settings').select('salon_id,dormant_after_weeks').eq('salon_id',salonId).maybeSingle()
     ])
-    for(const result of [m,s,c,a,v,p,br]) if(result.error) showToast(result.error.message)
+    for(const result of [m,s,c,a,v,p,br,bs]) if(result.error) showToast(result.error.message)
     setMembers((m.data||[]) as Member[]); setServices((s.data||[]) as Service[]); setClients((c.data||[]) as Client[])
-    setAppointments((a.data||[]) as Appointment[]); setVisits((v.data||[]) as Visit[]); setProducts((p.data||[]) as Product[]); setBookingRequests((br.data||[]) as BookingRequest[])
+    setAppointments((a.data||[]) as Appointment[]); setVisits((v.data||[]) as Visit[]); setProducts((p.data||[]) as Product[]); setBookingRequests((br.data||[]) as BookingRequest[]); setBusinessSettings((bs.data as BusinessSettings)||null)
   }
 
   function subscribeRealtime(){
@@ -242,11 +247,10 @@ export default function App(){
   const retention=useMemo(()=>clients.map(c=>{
     const history=visits.filter(v=>v.client_id===c.id).sort((a,b)=>b.occurred_on.localeCompare(a.occurred_on))
     const last=history[0]; if(!last) return null
-    const due=Number(c.recurrence_weeks || serviceBy(c.preferred_service_id)?.recurrence_weeks || 0)
-    if(!due) return null
+    const due=Number(c.dormant_after_weeks || businessSettings?.dormant_after_weeks || c.recurrence_weeks || serviceBy(c.preferred_service_id)?.recurrence_weeks || 8)
     const passed=weeksBetween(last.occurred_on); const late=passed-due
     return {client:c,last,due,passed,late}
-  }).filter(Boolean).filter((x:any)=>x.late>=0).sort((a:any,b:any)=>b.late-a.late) as {client:Client;last:Visit;due:number;passed:number;late:number}[],[clients,visits,services])
+  }).filter(Boolean).filter((x:any)=>x.late>=0).sort((a:any,b:any)=>b.late-a.late) as {client:Client;last:Visit;due:number;passed:number;late:number}[],[clients,visits,services,businessSettings?.dormant_after_weeks])
 
   const lowStock=products.filter(p=>Number(p.current_stock)<=Number(p.min_stock))
 
@@ -270,14 +274,14 @@ export default function App(){
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
-      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onWebsite={()=>{window.location.href='/?site=1'}} onSiteSettings={()=>setModal({kind:'siteSettings'})} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
+      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onWebsite={()=>{window.location.href='/?site=1'}} onBusinessHub={()=>setModal({kind:'businessHub'})} onSiteSettings={()=>setModal({kind:'siteSettings'})} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
     </main>
 
     <nav className="bottomNav">
       {(['today','agenda','clients','alerts','stock'] as View[]).map(v=><button key={v} className={view===v?'active':''} onClick={()=>setView(v)}><span>{navIcon(v)}</span><small>{navLabel(v)}</small></button>)}
     </nav>
 
-    {modal && <ModalLayer modal={modal} close={()=>setModal(null)} membership={membership} members={members} services={services} clients={clients} appointments={appointments} visits={visits} products={products} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} manager={manager} onSaved={async(message)=>{setModal(null);showToast(message);await loadData()}} onOpen={(m)=>setModal(m)} />}
+    {modal && <ModalLayer modal={modal} close={()=>setModal(null)} membership={membership} members={members} services={services} clients={clients} appointments={appointments} visits={visits} products={products} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} manager={manager} onSaved={async(message)=>{setModal(null);showToast(message);await loadData()}} onOpen={(m)=>setModal(m)} onDataChanged={loadData} />}
     {toast && <div className="toast">{toast}</div>}
   </div>
 
@@ -453,10 +457,11 @@ function StockView({products,query,setQuery,onScan,onNew,onEdit,onChange}:{produ
   return <><div className="stockActions"><button className="primary" onClick={onScan}>▣ Scan código</button><button className="secondary" onClick={onNew}>+ Produto</button></div><div className="searchRow"><input type="search" placeholder="Produto, marca ou código…" value={query} onChange={e=>setQuery(e.target.value)} /></div><div className="stack">{arr.map(p=><ProductCard key={p.id} p={p} actions={<><button className="mini" onClick={()=>onChange(p,-1)}>−1</button><button className="mini" onClick={()=>onChange(p,1)}>+1</button><button className="mini" onClick={()=>onEdit(p)}>Editar</button></>} />)}</div></>
 }
 
-function MoreView({membership,salon,manager,onWebsite,onSiteSettings,onServices,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
+function MoreView({membership,salon,manager,onWebsite,onBusinessHub,onSiteSettings,onServices,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onWebsite:()=>void;onBusinessHub:()=>void;onSiteSettings:()=>void;onServices:()=>void;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
   return <div className="stack">
     <div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>
     <button className="menuCard" onClick={onWebsite}><span>↗</span><div><strong>Ver website</strong><small>Pré-visualizar a homepage pública do salão.</small></div><b>›</b></button>
+    {manager&&<button className="menuCard" onClick={onBusinessHub}><span>◫</span><div><strong>Gestão do negócio</strong><small>Dashboard, marcações, horários, retenção, fidelização e vendas.</small></div><b>›</b></button>}
     {manager&&<button className="menuCard" onClick={onSiteSettings}><span>⚙︎</span><div><strong>Website e contactos</strong><small>WhatsApp, Instagram, morada e telefone visíveis no website.</small></div><b>›</b></button>}
     {manager&&<button className="menuCard" onClick={onServices}><span>✂︎</span><div><strong>Serviços</strong><small>Preços, duração e recorrência dos serviços do salão.</small></div><b>›</b></button>}
     {manager&&<button className="menuCard" onClick={onAddStaff}><span>👤</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}
@@ -465,8 +470,8 @@ function MoreView({membership,salon,manager,onWebsite,onSiteSettings,onServices,
   </div>
 }
 
-function ModalLayer({modal,close,membership,members,services,clients,appointments,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void}){
-  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} presetService={modal.presetService} presetDate={modal.presetDate} presetTime={modal.presetTime} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={async message=>{if(modal.bookingRequestId)await supabase.from('booking_requests').update({status:'booked',updated_at:new Date().toISOString()}).eq('id',modal.bookingRequestId);onSaved(message)}} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}{modal.kind==='siteSettings'&&<SiteSettingsForm membership={membership} onSaved={onSaved} />}</div></div>
+function ModalLayer({modal,close,membership,members,services,clients,appointments,visits,products,clientBy,serviceBy,memberBy,manager,onSaved,onOpen,onDataChanged}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void;onDataChanged:()=>void|Promise<void>}){
+  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} presetService={modal.presetService} presetDate={modal.presetDate} presetTime={modal.presetTime} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={async message=>{if(modal.bookingRequestId)await supabase.from('booking_requests').update({status:'booked',updated_at:new Date().toISOString()}).eq('id',modal.bookingRequestId);onSaved(message)}} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}{modal.kind==='siteSettings'&&<SiteSettingsForm membership={membership} onSaved={onSaved} />}{modal.kind==='businessHub'&&<BusinessHub membership={membership} members={members} clients={clients} services={services} appointments={appointments} visits={visits} onChanged={onDataChanged} />}</div></div>
 }
 
 function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:string)=>void}){
@@ -711,6 +716,7 @@ function ClientForm({item,prefill,membership,services,members,onSaved}:{item?:Cl
       preferred_service_id:String(fd.get('preferred_service_id')||'')||null,
       preferred_employee_id:String(fd.get('preferred_employee_id')||'')||null,
       recurrence_weeks:Number(fd.get('recurrence_weeks')||0)||null,
+      dormant_after_weeks:Number(fd.get('dormant_after_weeks')||0)||null,
       notes:String(fd.get('notes')||'')||null
     }
     const q=item?supabase.from('clients').update(payload).eq('id',item.id):supabase.from('clients').insert(payload)
@@ -735,7 +741,8 @@ function ClientForm({item,prefill,membership,services,members,onSaved}:{item?:Cl
         <label>Serviço habitual<select name="preferred_service_id" defaultValue={item?.preferred_service_id||services[0]?.id||''}><option value="">Sem preferência</option>{services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         <label>Repetir a cada <span className="optionalLabel">semanas</span><input name="recurrence_weeks" type="number" inputMode="numeric" min="1" max="52" defaultValue={item?.recurrence_weeks||''} placeholder="Ex.: 5"/></label>
       </div>
-      <p className="formHint">Estas preferências ficam pré-selecionadas quando crias uma nova marcação.</p>
+      <label>Considerar adormecido após <span className="optionalLabel">opcional</span><div className="inlineUnit"><input name="dormant_after_weeks" type="number" inputMode="numeric" min="1" max="104" defaultValue={item?.dormant_after_weeks||''} placeholder="Usar regra geral"/><span>semanas</span></div></label>
+      <p className="formHint">Estas preferências ficam pré-selecionadas quando crias uma nova marcação. O prazo de cliente adormecido pode substituir a regra geral do negócio.</p>
     </section>
 
     <section className="formSection">
@@ -1178,7 +1185,7 @@ function Section({title,children}:{title:string;children:ReactNode}){return <sec
 function Empty({children}:{children:ReactNode}){return <div className="empty">{children}</div>}
 function InfoCard({label,children}:{label:string;children:ReactNode}){return <div className="infoCard"><span>{label}</span><strong>{children}</strong></div>}
 
-function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):m.kind==='siteSettings'?'Website e contactos':'Convidar colaborador'}
+function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):m.kind==='siteSettings'?'Website e contactos':m.kind==='businessHub'?'Gestão do negócio':'Convidar colaborador'}
 function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Conta'} as const)[v]}
 function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Mais'} as const)[v]}
 function navIcon(v:View){return ({today:'⌂',agenda:'□',clients:'♙',alerts:'!',stock:'▤',more:'•••'} as const)[v]}
