@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { isConfigured, supabase } from './lib/supabase'
 import { BrowserMultiFormatReader } from '@zxing/browser'
@@ -633,7 +633,7 @@ function AgendaView({date,setDate,items,appointments,members,manager,mode,setMod
 
     {viewMode==='day'&&<>
       <div className="dayTitle">{dateLabel(date)}{!manager&&<span className="tag">{membership.display_name}</span>}</div>
-      <div className="timeline">{items.length?items.map(a=>{const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id);return <div className="timeRow" key={a.id}><div className="time">{hhmm(a.starts_at)}</div><article className="bookingCard memberColorCard" style={{'--member-color':member?.calendar_color||'#6F8FAF'} as React.CSSProperties}><button className="bookingMain" onClick={()=>onOpen(a)}><strong>{client?.name||'Cliente'}</strong><span><i className="memberColorDot" style={{background:member?.calendar_color||'#6F8FAF'}}/>{service?.name||'Serviço'} · {member?.display_name}</span>{a.notes&&<small>{a.notes}</small>}</button><button className="calendarBtn" onClick={()=>onICS(a)} title="Adicionar ao calendário">▣</button></article></div>}):<Empty>Sem marcações neste dia.</Empty>}</div>
+      <div className="timeline">{items.length?items.map(a=>{const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id);return <div className="timeRow" key={a.id}><div className="time">{hhmm(a.starts_at)}</div><article className="bookingCard memberColorCard" style={{'--member-color':member?.calendar_color||'#6F8FAF'} as CSSProperties}><button className="bookingMain" onClick={()=>onOpen(a)}><strong>{client?.name||'Cliente'}</strong><span><i className="memberColorDot" style={{background:member?.calendar_color||'#6F8FAF'}}/>{service?.name||'Serviço'} · {member?.display_name}</span>{a.notes&&<small>{a.notes}</small>}</button><button className="calendarBtn" onClick={()=>onICS(a)} title="Adicionar ao calendário">▣</button></article></div>}):<Empty>Sem marcações neste dia.</Empty>}</div>
     </>}
 
     {viewMode==='week'&&<div className="weekAgenda">
@@ -647,7 +647,7 @@ function AgendaView({date,setDate,items,appointments,members,manager,mode,setMod
           </button>
           {dayItems.length?<div className="weekBookings">{dayItems.map(a=>{
             const client=clientBy(a.client_id),service=serviceBy(a.service_id),member=memberBy(a.employee_id)
-            return <button className="weekBooking memberColorCard" style={{'--member-color':member?.calendar_color||'#6F8FAF'} as React.CSSProperties} key={a.id} onClick={()=>onOpen(a)}><span>{hhmm(a.starts_at)}</span><div><strong>{client?.name||'Cliente'}</strong><small><i className="memberColorDot" style={{background:member?.calendar_color||'#6F8FAF'}}/>{service?.name||'Serviço'} · {member?.display_name||''}</small></div></button>
+            return <button className="weekBooking memberColorCard" style={{'--member-color':member?.calendar_color||'#6F8FAF'} as CSSProperties} key={a.id} onClick={()=>onOpen(a)}><span>{hhmm(a.starts_at)}</span><div><strong>{client?.name||'Cliente'}</strong><small><i className="memberColorDot" style={{background:member?.calendar_color||'#6F8FAF'}}/>{service?.name||'Serviço'} · {member?.display_name||''}</small></div></button>
           })}</div>:<div className="weekEmpty">Sem marcações</div>}
         </section>
       })}
