@@ -843,6 +843,8 @@ function SiteSettingsForm({membership,onSaved}:{membership:Member;onSaved:(m:str
 }
 
 function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,membership,members,services,clients,appointments,manager,onSaved,onVisit,onDelete}:{item?:Appointment;presetClient?:string;presetService?:string;presetDate?:string;presetTime?:string;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];manager:boolean;onSaved:(m:string)=>void;onVisit:(a:Appointment)=>void;onDelete:(a:Appointment)=>void}){
+  const [localClients,setLocalClients]=useState<Client[]>(clients)
+  useEffect(()=>setLocalClients(clients),[clients])
   const initialClientId=item?.client_id||presetClient||clients[0]?.id||''
   const initialClient=clients.find(c=>c.id===initialClientId)
   const [clientId,setClientId]=useState(initialClientId)
@@ -851,17 +853,52 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
   const [date,setDate]=useState(item?localISODate(new Date(item.starts_at)):(presetDate||todayISO()))
   const [time,setTime]=useState(item?`${String(new Date(item.starts_at).getHours()).padStart(2,'0')}:${String(new Date(item.starts_at).getMinutes()).padStart(2,'0')}`:(presetTime||'09:00'))
   const [busy,setBusy]=useState(false)
+  const [newClientOpen,setNewClientOpen]=useState(clients.length===0)
+  const [creatingClient,setCreatingClient]=useState(false)
+  const [newClient,setNewClient]=useState({name:'',phone:'',email:''})
 
   function changeClient(nextId:string){
     setClientId(nextId)
     if(item) return
-    const next=clients.find(c=>c.id===nextId)
+    const next=localClients.find(c=>c.id===nextId)
     if(next?.preferred_service_id) setServiceId(next.preferred_service_id)
     if(manager && next?.preferred_employee_id) setEmployeeId(next.preferred_employee_id)
   }
 
+  async function createClient(){
+    const name=newClient.name.trim()
+    if(!name)return alert('Indica o nome do novo cliente.')
+    setCreatingClient(true)
+    const payload={
+      salon_id:membership.salon_id,
+      name,
+      phone:newClient.phone.trim()||null,
+      email:newClient.email.trim()||null,
+      birth_date:null,
+      preferred_service_id:null,
+      preferred_employee_id:null,
+      recurrence_weeks:null,
+      dormant_after_weeks:null,
+      notes:null
+    }
+    const {data,error}=await supabase.from('clients').insert(payload).select('*').single()
+    setCreatingClient(false)
+    if(error)return alert('Não foi possível criar o cliente: '+error.message)
+    const created=data as Client
+    setLocalClients(current=>[...current,created].sort((a,b)=>a.name.localeCompare(b.name)))
+    setClientId(created.id)
+    setNewClientOpen(false)
+    setNewClient({name:'',phone:'',email:''})
+    if(!item){
+      if(created.preferred_service_id)setServiceId(created.preferred_service_id)
+      if(manager&&created.preferred_employee_id)setEmployeeId(created.preferred_employee_id)
+    }
+  }
+
   async function submit(e:FormEvent<HTMLFormElement>){
-    e.preventDefault();setBusy(true)
+    e.preventDefault()
+    if(!clientId)return alert('Seleciona ou cria um cliente.')
+    setBusy(true)
     const fd=new FormData(e.currentTarget)
     const service=services.find(x=>x.id===serviceId)
     const start=new Date(`${date}T${time}:00`)
@@ -903,27 +940,54 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
     )
     if(conflict){
       setBusy(false)
-      const conflictClient=clients.find(c=>c.id===conflict.client_id)
+      const conflictClient=localClients.find(c=>c.id===conflict.client_id)
       return alert(`Este profissional já tem uma marcação entre ${hhmm(conflict.starts_at)} e ${hhmm(conflict.ends_at)}${conflictClient?` (${conflictClient.name})`:''}.`)
     }
+
+    if(!item){
+      const sameDay=appointments
+        .filter(a=>a.client_id===clientId&&a.status!=='cancelled'&&localISODate(new Date(a.starts_at))===date)
+        .sort((a,b)=>a.starts_at.localeCompare(b.starts_at))
+      if(sameDay.length){
+        const client=localClients.find(c=>c.id===clientId)
+        const details=sameDay.map(a=>{
+          const existingService=services.find(s=>s.id===a.service_id)
+          return `${hhmm(a.starts_at)}${existingService?` · ${existingService.name}`:''}`
+        }).join('\n')
+        const confirmed=window.confirm(`${client?.name||'Esta cliente'} já tem ${sameDay.length===1?'uma marcação':'marcações'} neste dia:\n\n${details}\n\nQueres criar uma segunda marcação/serviço no mesmo dia?`)
+        if(!confirmed){setBusy(false);return}
+      }
+    }
+
     const payload={salon_id:membership.salon_id,client_id:clientId,service_id:serviceId||null,employee_id:targetEmployee,starts_at:start.toISOString(),ends_at:end.toISOString(),status:String(fd.get('status')||'pending'),notes:String(fd.get('notes')||'')||null}
     const q=item?supabase.from('appointments').update(payload).eq('id',item.id):supabase.from('appointments').insert(payload)
-    const {error}=await q;setBusy(false)
+    const {error}=await q
+    setBusy(false)
     if(error)alert(error.message);else onSaved(item?'Marcação atualizada.':'Marcação criada.')
   }
 
   return <form className="formStack appointmentForm" onSubmit={submit}>
-    <label>Cliente<select name="client_id" value={clientId} onChange={e=>changeClient(e.target.value)}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+    <div className="appointmentClientBlock">
+      <div className="appointmentFieldHeader"><strong>Cliente</strong>{!item&&<button type="button" className="inlineCreateButton" onClick={()=>setNewClientOpen(v=>!v)}>{newClientOpen?'Cancelar':'+ Novo cliente'}</button>}</div>
+      {localClients.length>0&&<select name="client_id" value={clientId} onChange={e=>changeClient(e.target.value)}><option value="">Selecionar cliente…</option>{localClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>}
+      {newClientOpen&&<div className="quickClientCreate">
+        <div className="quickClientGrid">
+          <label>Nome<input value={newClient.name} onChange={e=>setNewClient(v=>({...v,name:e.target.value}))} placeholder="Nome do cliente" autoFocus/></label>
+          <label>Telemóvel <span className="optionalLabel">opcional</span><input value={newClient.phone} onChange={e=>setNewClient(v=>({...v,phone:e.target.value}))} inputMode="tel" placeholder="9xx xxx xxx"/></label>
+        </div>
+        <label>Email <span className="optionalLabel">opcional</span><input value={newClient.email} onChange={e=>setNewClient(v=>({...v,email:e.target.value}))} type="email" placeholder="email@exemplo.pt"/></label>
+        <button type="button" className="secondary full" disabled={creatingClient} onClick={()=>void createClient()}>{creatingClient?'A criar…':'Criar cliente e continuar'}</button>
+      </div>}
+    </div>
     <label>Serviço<select value={serviceId} onChange={e=>setServiceId(e.target.value)}>{services.map(s=><option key={s.id} value={s.id}>{s.name} · {s.duration_minutes} min · {money(s.price)}</option>)}</select></label>
     {manager&&<label>Profissional<select name="employee_id" value={employeeId} onChange={e=>setEmployeeId(e.target.value)}>{members.map(m=><option key={m.id} value={m.id}>{m.display_name}</option>)}</select></label>}
     <div className="grid2 appointmentDateTime"><label>Data<input type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label><label>Hora<input type="time" value={time} onChange={e=>setTime(e.target.value)} required/></label></div>
     {item&&<label>Estado<select name="status" defaultValue={item.status}><option value="pending">Pendente</option><option value="confirmed">Confirmada</option><option value="completed">Concluída</option><option value="no_show">Faltou</option></select></label>}
     <label>Observações <span className="optionalLabel">opcional</span><textarea name="notes" defaultValue={item?.notes||''} placeholder="Ex.: preferência, atraso, detalhe importante…"/></label>
-    <button className="primary full appointmentSave" disabled={busy}>{busy?'A guardar…':item?'Guardar alterações':'Guardar marcação'}</button>
+    <button className="primary full appointmentSave" disabled={busy||creatingClient}>{busy?'A guardar…':item?'Guardar alterações':'Guardar marcação'}</button>
     {item&&<div className="modalBottomActions"><button type="button" className="secondary" onClick={()=>onVisit(item)}>Concluir + histórico</button><button type="button" className="dangerButton" onClick={()=>onDelete(item)}>Cancelar marcação</button></div>}
   </form>
 }
-
 
 function ServicesManager({services,onNew,onEdit}:{services:Service[];onNew:()=>void;onEdit:(service:Service)=>void}){
   return <div className="stack serviceManager">
