@@ -5,7 +5,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import { createWorker } from 'tesseract.js'
 import LandingPage from './LandingPage'
 import BarberDemo from './BarberDemo'
-import BusinessHub from './BusinessTools'
+import BusinessHub, { type BusinessTab } from './BusinessTools'
 
 type Role = 'owner' | 'manager' | 'employee'
 type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
@@ -18,6 +18,21 @@ type Product = { id:string; salon_id:string; name:string; brand:string|null; bar
 type BookingRequest = { id:string; salon_id:string; client_id:string|null; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'|'no_preference'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
 type Salon = { id:string; name:string; timezone:string }
 type BusinessSettings = { salon_id:string; dormant_after_weeks:number }
+type DashboardWidget = 'summary'|'business'|'sales'|'appointments'|'requests'|'tomorrow'|'recovery'|'birthdays'|'stock'
+type SaleSummary = { id:string; occurred_at:string; total_amount:number }
+
+const defaultDashboardWidgets:DashboardWidget[]=['summary','business','appointments','requests','tomorrow','recovery','birthdays']
+const dashboardWidgetOptions:{id:DashboardWidget;label:string;description:string;managerOnly?:boolean}[]=[
+  {id:'summary',label:'Resumo do dia',description:'Marcações, pedidos e confirmações.'},
+  {id:'business',label:'Gestão do negócio',description:'Atalho para dashboard, vendas e gestão.',managerOnly:true},
+  {id:'sales',label:'Vendas do mês',description:'Faturação registada e ticket médio.',managerOnly:true},
+  {id:'appointments',label:'Marcações de hoje',description:'Próximas marcações do dia.'},
+  {id:'requests',label:'Pedidos online',description:'Pedidos que aguardam tratamento.'},
+  {id:'tomorrow',label:'Confirmar amanhã',description:'Marcações de amanhã a confirmar.'},
+  {id:'recovery',label:'Clientes a recuperar',description:'Clientes considerados adormecidos.'},
+  {id:'birthdays',label:'Aniversários',description:'Aniversários dos próximos 7 dias.'},
+  {id:'stock',label:'Stock baixo',description:'Produtos abaixo do mínimo.',managerOnly:true}
+]
 
 type Modal =
   | { kind:'appointment'; item?:Appointment; presetClient?:string; presetService?:string; presetDate?:string; presetTime?:string; bookingRequestId?:string }
@@ -31,7 +46,8 @@ type Modal =
   | { kind:'services' }
   | { kind:'service'; item?:Service }
   | { kind:'siteSettings' }
-  | { kind:'businessHub' }
+  | { kind:'businessHub'; tab?:BusinessTab }
+  | { kind:'dashboardCustomize' }
   | null
 
 const locale = 'pt-PT'
@@ -110,6 +126,10 @@ export default function App(){
   const [products,setProducts]=useState<Product[]>([])
   const [bookingRequests,setBookingRequests]=useState<BookingRequest[]>([])
   const [businessSettings,setBusinessSettings]=useState<BusinessSettings|null>(null)
+  const [dashboardWidgets,setDashboardWidgets]=useState<DashboardWidget[]>(defaultDashboardWidgets)
+  const [monthSales,setMonthSales]=useState<SaleSummary[]>([])
+  const [menuOpen,setMenuOpen]=useState(false)
+  const [businessMenuOpen,setBusinessMenuOpen]=useState(false)
   const [view,setView]=useState<View>('today')
   const [agendaDate,setAgendaDate]=useState(todayISO())
   const [agendaMode,setAgendaMode]=useState<'mine'|'team'>('mine')
