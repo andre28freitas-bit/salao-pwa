@@ -8,7 +8,7 @@ import BarberDemo from './BarberDemo'
 import BusinessHub, { type BusinessTab } from './BusinessTools'
 
 type Role = 'owner' | 'manager' | 'employee'
-type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock' | 'more'
+type View = 'today' | 'agenda' | 'clients' | 'alerts' | 'stock'
 type Member = { id:string; salon_id:string; user_id:string|null; display_name:string; role:Role; active:boolean; calendar_color:string }
 type Service = { id:string; salon_id:string; name:string; duration_minutes:number; price:number; recurrence_weeks:number|null; image_url:string|null; active:boolean }
 type Client = { id:string; salon_id:string; name:string; phone:string|null; email:string|null; birth_date:string|null; notes:string|null; preferred_service_id:string|null; preferred_employee_id:string|null; recurrence_weeks:number|null; dormant_after_weeks:number|null }
@@ -339,7 +339,6 @@ export default function App(){
         <div className="desktopHeaderCopy"><div className="eyebrow">{salon?.name||'SALÃO'}</div><h1>{titleFor(view)}</h1></div>
       </div>
       <div className="topbarActions">
-        <button className="avatar" onClick={()=>setView('more')} aria-label="Abrir conta">{initials(membership.display_name)}</button>
         <button className={menuOpen?'appMenuToggle open':'appMenuToggle'} onClick={()=>setMenuOpen(v=>!v)} aria-label={menuOpen?'Fechar menu':'Abrir menu'} aria-expanded={menuOpen}>
           {menuOpen?<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>:<svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg>}
         </button>
@@ -360,6 +359,8 @@ export default function App(){
       onSiteSettings={()=>{setModal({kind:'siteSettings'});setMenuOpen(false)}}
       onServices={()=>{setModal({kind:'services'});setMenuOpen(false)}}
       onCustomize={()=>{setModal({kind:'dashboardCustomize'});setMenuOpen(false)}}
+      onLogout={()=>supabase.auth.signOut()}
+      membership={membership}
     />
 
     <main className="content">
@@ -368,7 +369,6 @@ export default function App(){
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
-      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onWebsite={()=>{window.location.href='/?site=1'}} onBusinessHub={()=>setModal({kind:'businessHub',tab:'dashboard'})} onSiteSettings={()=>setModal({kind:'siteSettings'})} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
     </main>
 
     <nav className="bottomNav">
@@ -473,7 +473,7 @@ function DesktopSidebar({logoUrl,salonName,membership,view,manager,businessOpen,
   </aside>
 }
 
-function AppMenu({open,logoUrl,salonName,manager,businessOpen,setBusinessOpen,onClose,onView,onBusiness,onWebsite,onSiteSettings,onServices,onCustomize}:{open:boolean;logoUrl:string|null;salonName:string;manager:boolean;businessOpen:boolean;setBusinessOpen:(v:boolean)=>void;onClose:()=>void;onView:(v:View)=>void;onBusiness:(tab:BusinessTab)=>void;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onCustomize:()=>void}){
+function AppMenu({open,logoUrl,salonName,membership,manager,businessOpen,setBusinessOpen,onClose,onView,onBusiness,onWebsite,onSiteSettings,onServices,onCustomize,onLogout}:{open:boolean;logoUrl:string|null;salonName:string;membership:Member;manager:boolean;businessOpen:boolean;setBusinessOpen:(v:boolean)=>void;onClose:()=>void;onView:(v:View)=>void;onBusiness:(tab:BusinessTab)=>void;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onCustomize:()=>void;onLogout:()=>void}){
   if(!open) return null
   const navItems:[View,string,string][]=[
     ['today','Hoje','Resumo e prioridades do dia'],
@@ -508,6 +508,10 @@ function AppMenu({open,logoUrl,salonName,manager,businessOpen,setBusinessOpen,on
         {manager&&<button className="appMenuItem" onClick={onServices}><div><strong>Serviços</strong><span>Preços, duração e imagens</span></div><b>›</b></button>}
         {manager&&<button className="appMenuItem" onClick={onSiteSettings}><div><strong>Website e contactos</strong><span>Identidade e contactos públicos</span></div><b>›</b></button>}
         <button className="appMenuItem" onClick={onWebsite}><div><strong>Ver website</strong><span>Abrir a página pública</span></div><b>↗</b></button>
+        <div className="appMenuAccount">
+          <div className="appMenuAccountUser"><div className="appMenuAccountAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)}</span></div></div>
+          <button className="appMenuLogout" onClick={onLogout}>Terminar sessão</button>
+        </div>
       </div>
     </aside>
   </div>
@@ -688,21 +692,8 @@ function StockView({products,query,setQuery,onScan,onNew,onEdit,onChange}:{produ
   return <><div className="stockActions"><button className="primary" onClick={onScan}>▣ Scan código</button><button className="secondary" onClick={onNew}>+ Produto</button></div><div className="searchRow"><input type="search" placeholder="Produto, marca ou código…" value={query} onChange={e=>setQuery(e.target.value)} /></div><div className="stack">{arr.map(p=><ProductCard key={p.id} p={p} actions={<><button className="mini" onClick={()=>onChange(p,-1)}>−1</button><button className="mini" onClick={()=>onChange(p,1)}>+1</button><button className="mini" onClick={()=>onEdit(p)}>Editar</button></>} />)}</div></>
 }
 
-function MoreView({membership,salon,manager,onWebsite,onBusinessHub,onSiteSettings,onServices,onAddStaff,onInvite,onLogout}:{membership:Member;salon:Salon|null;manager:boolean;onWebsite:()=>void;onBusinessHub:()=>void;onSiteSettings:()=>void;onServices:()=>void;onAddStaff:()=>void;onInvite:()=>void;onLogout:()=>void}){
-  return <div className="stack">
-    <div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>
-    <button className="menuCard" onClick={onWebsite}><span>↗</span><div><strong>Ver website</strong><small>Pré-visualizar a homepage pública do salão.</small></div><b>›</b></button>
-    {manager&&<button className="menuCard" onClick={onBusinessHub}><span>◫</span><div><strong>Gestão do negócio</strong><small>Dashboard, marcações, horários, retenção, fidelização e vendas.</small></div><b>›</b></button>}
-    {manager&&<button className="menuCard" onClick={onSiteSettings}><span>⚙︎</span><div><strong>Website e contactos</strong><small>WhatsApp, Instagram, morada e telefone visíveis no website.</small></div><b>›</b></button>}
-    {manager&&<button className="menuCard" onClick={onServices}><span>✂︎</span><div><strong>Serviços</strong><small>Preços, duração e recorrência dos serviços do salão.</small></div><b>›</b></button>}
-    {manager&&<button className="menuCard" onClick={onAddStaff}><span>👤</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}
-    {manager&&<button className="menuCard" onClick={onInvite}><span>👥</span><div><strong>Convidar colaborador com acesso</strong><small>Envia um convite por email para usar a aplicação.</small></div><b>›</b></button>}
-    <button className="menuCard" onClick={onLogout}><span>↪</span><div><strong>Terminar sessão</strong><small>Sair deste dispositivo.</small></div><b>›</b></button>
-  </div>
-}
-
 function ModalLayer({modal,close,membership,members,services,clients,appointments,visits,products,clientBy,serviceBy,memberBy,manager,dashboardWidgets,onDashboardSaved,onSaved,onOpen,onDataChanged}:{modal:Exclude<Modal,null>;close:()=>void;membership:Member;members:Member[];services:Service[];clients:Client[];appointments:Appointment[];visits:Visit[];products:Product[];clientBy:(id:string)=>Client|undefined;serviceBy:(id:string|null)=>Service|undefined;memberBy:(id:string)=>Member|undefined;manager:boolean;dashboardWidgets:DashboardWidget[];onDashboardSaved:(widgets:DashboardWidget[])=>void|Promise<void>;onSaved:(m:string)=>void;onOpen:(m:Modal)=>void;onDataChanged:()=>void|Promise<void>}){
-  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} presetService={modal.presetService} presetDate={modal.presetDate} presetTime={modal.presetTime} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={async message=>{if(modal.bookingRequestId)await supabase.from('booking_requests').update({status:'booked',updated_at:new Date().toISOString()}).eq('id',modal.bookingRequestId);onSaved(message)}} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}{modal.kind==='siteSettings'&&<SiteSettingsForm membership={membership} onSaved={onSaved} />}{modal.kind==='businessHub'&&<BusinessHub membership={membership} members={members} clients={clients} services={services} appointments={appointments} visits={visits} onChanged={onDataChanged} initialTab={modal.tab||'dashboard'} />}{modal.kind==='dashboardCustomize'&&<DashboardCustomizer widgets={dashboardWidgets} manager={manager} onSave={onDashboardSaved} />}</div></div>
+  return <div className="modalBackdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modalCard"><div className="modalHead"><h2>{modalTitle(modal)}</h2><button className="iconButton" onClick={close}>×</button></div>{modal.kind==='appointment'&&<AppointmentForm item={modal.item} presetClient={modal.presetClient} presetService={modal.presetService} presetDate={modal.presetDate} presetTime={modal.presetTime} membership={membership} members={members} services={services} clients={clients} appointments={appointments} manager={manager} onSaved={async message=>{if(modal.bookingRequestId)await supabase.from('booking_requests').update({status:'booked',updated_at:new Date().toISOString()}).eq('id',modal.bookingRequestId);onSaved(message)}} onVisit={a=>onOpen({kind:'visit',appointment:a,client:clientBy(a.client_id)!})} onDelete={async a=>{const {error}=await supabase.from('appointments').update({status:'cancelled'}).eq('id',a.id); if(error)alert(error.message); else onSaved('Marcação cancelada.')}} />}{modal.kind==='client'&&<ClientForm item={modal.item} prefill={modal.prefill} membership={membership} services={services} members={members} onSaved={onSaved} />}{modal.kind==='clientDetail'&&<ClientDetail client={modal.client} appointments={appointments} visits={visits} services={services} memberBy={memberBy} onEdit={()=>onOpen({kind:'client',item:modal.client})} onBook={()=>onOpen({kind:'appointment',presetClient:modal.client.id})} onVisit={()=>onOpen({kind:'visit',client:modal.client})} />}{modal.kind==='visit'&&<VisitForm client={modal.client} appointment={modal.appointment} membership={membership} serviceBy={serviceBy} onSaved={onSaved} />}{modal.kind==='product'&&<ProductForm item={modal.item} barcode={modal.barcode} membership={membership} onSaved={onSaved} />}{modal.kind==='scanner'&&<Scanner onFound={code=>{const existing=products.find(p=>p.barcode===code); onOpen(existing?{kind:'product',item:existing}:{kind:'product',barcode:code})}} />}{modal.kind==='staff'&&<StaffForm onSaved={onSaved} />}{modal.kind==='invite'&&<InviteForm onSaved={onSaved} />}{modal.kind==='services'&&<ServicesManager services={services} onNew={()=>onOpen({kind:'service'})} onEdit={service=>onOpen({kind:'service',item:service})} />}{modal.kind==='service'&&<ServiceForm item={modal.item} membership={membership} onSaved={onSaved} />}{modal.kind==='siteSettings'&&<SiteSettingsForm membership={membership} onSaved={onSaved} />}{modal.kind==='businessHub'&&<BusinessHub membership={membership} members={members} clients={clients} services={services} appointments={appointments} visits={visits} onChanged={onDataChanged} initialTab={modal.tab||'dashboard'} onAddStaff={()=>onOpen({kind:'staff'})} onInvite={()=>onOpen({kind:'invite'})} />}{modal.kind==='dashboardCustomize'&&<DashboardCustomizer widgets={dashboardWidgets} manager={manager} onSave={onDashboardSaved} />}</div></div>
 }
 
 function DashboardCustomizer({widgets,manager,onSave}:{widgets:DashboardWidget[];manager:boolean;onSave:(widgets:DashboardWidget[])=>void|Promise<void>}){
@@ -1593,7 +1584,7 @@ function InfoCard({label,children}:{label:string;children:ReactNode}){return <di
 
 function modalTitle(m:Exclude<Modal,null>){return m.kind==='appointment'?(m.item?'Editar marcação':'Nova marcação'):m.kind==='client'?(m.item?'Editar cliente':'Novo cliente'):m.kind==='clientDetail'?m.client.name:m.kind==='visit'?'Registar visita':m.kind==='product'?(m.item?'Editar produto':'Novo produto'):m.kind==='scanner'?'Ler código de barras':m.kind==='staff'?'Adicionar profissional':m.kind==='services'?'Serviços':m.kind==='service'?(m.item?'Editar serviço':'Novo serviço'):m.kind==='siteSettings'?'Website e contactos':m.kind==='businessHub'?'Gestão do negócio':m.kind==='dashboardCustomize'?'Personalizar página inicial':'Convidar colaborador'}
 function titleFor(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Conta'} as const)[v]}
-function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock',more:'Mais'} as const)[v]}
+function navLabel(v:View){return ({today:'Hoje',agenda:'Agenda',clients:'Clientes',alerts:'Alertas',stock:'Stock'} as const)[v]}
 function NavGlyph({view}:{view:View}){
   if(view==='today') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.6 12 3.8l8.5 6.8v9.1a.8.8 0 0 1-.8.8H4.3a.8.8 0 0 1-.8-.8v-9.1Z"/><path d="M9 20.5v-6.2h6v6.2"/></svg>
   if(view==='agenda') return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M7.5 3.5v4M16.5 3.5v4M3.5 9.5h17"/></svg>
