@@ -306,23 +306,42 @@ export default function App(){
   return <div className="appShell">
     <header className="topbar">
       <div><div className="eyebrow">{salon?.name||'SALÃO'}</div><h1>{titleFor(view)}</h1></div>
-      <button className="avatar" onClick={()=>setView('more')}>{initials(membership.display_name)}</button>
+      <div className="topbarActions">
+        <button className="avatar" onClick={()=>setView('more')} aria-label="Abrir conta">{initials(membership.display_name)}</button>
+        <button className={menuOpen?'appMenuToggle open':'appMenuToggle'} onClick={()=>setMenuOpen(v=>!v)} aria-label={menuOpen?'Fechar menu':'Abrir menu'} aria-expanded={menuOpen}>
+          {menuOpen?<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>:<svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg>}
+        </button>
+      </div>
     </header>
 
+    <AppMenu
+      open={menuOpen}
+      manager={manager}
+      businessOpen={businessMenuOpen}
+      setBusinessOpen={setBusinessMenuOpen}
+      onClose={()=>setMenuOpen(false)}
+      onView={next=>{setView(next);setMenuOpen(false)}}
+      onBusiness={tab=>{setModal({kind:'businessHub',tab});setMenuOpen(false)}}
+      onWebsite={()=>{window.location.href='/?site=1'}}
+      onSiteSettings={()=>{setModal({kind:'siteSettings'});setMenuOpen(false)}}
+      onServices={()=>{setModal({kind:'services'});setMenuOpen(false)}}
+      onCustomize={()=>{setModal({kind:'dashboardCustomize'});setMenuOpen(false)}}
+    />
+
     <main className="content">
-      {view==='today' && <TodayView clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} />}
+      {view==='today' && <TodayView manager={manager} widgets={dashboardWidgets} monthSales={monthSales} clients={clients} appointments={todayAppointments} tomorrowAppointments={tomorrowAppointments} bookingRequests={bookingRequests} upcomingBirthdays={upcomingBirthdays} retention={retention} lowStock={lowStock} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} salonName={salon?.name||'Salão'} onNew={()=>setModal({kind:'appointment'})} onClient={c=>setModal({kind:'clientDetail',client:c})} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} onBookingStatus={updateBookingRequestStatus} onBookingSchedule={convertBookingRequest} onBusinessHub={()=>setModal({kind:'businessHub',tab:'dashboard'})} onCustomize={()=>setModal({kind:'dashboardCustomize'})} />}
       {view==='agenda' && <AgendaView date={agendaDate} setDate={setAgendaDate} items={visibleAgenda} appointments={appointments} manager={manager} mode={agendaMode} setMode={setAgendaMode} membership={membership} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} onNew={()=>setModal({kind:'appointment'})} onOpen={a=>setModal({kind:'appointment',item:a})} onICS={a=>downloadICS(a,clientBy(a.client_id),serviceBy(a.service_id),memberBy(a.employee_id))} />}
       {view==='clients' && <ClientsView clients={clients} visits={visits} query={clientQuery} setQuery={setClientQuery} onNew={()=>startClientCreate(setModal,showToast)} onOpen={c=>setModal({kind:'clientDetail',client:c})} />}
       {view==='alerts' && <AlertsView retention={retention} lowStock={lowStock} onBook={c=>setModal({kind:'appointment',presetClient:c.id})} />}
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
-      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onWebsite={()=>{window.location.href='/?site=1'}} onBusinessHub={()=>setModal({kind:'businessHub'})} onSiteSettings={()=>setModal({kind:'siteSettings'})} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
+      {view==='more' && <MoreView membership={membership} salon={salon} manager={manager} onWebsite={()=>{window.location.href='/?site=1'}} onBusinessHub={()=>setModal({kind:'businessHub',tab:'dashboard'})} onSiteSettings={()=>setModal({kind:'siteSettings'})} onServices={()=>setModal({kind:'services'})} onAddStaff={()=>setModal({kind:'staff'})} onInvite={()=>setModal({kind:'invite'})} onLogout={()=>supabase.auth.signOut()} />}
     </main>
 
     <nav className="bottomNav">
       {(['today','agenda','clients','alerts','stock'] as View[]).map(v=><button key={v} className={view===v?'active':''} onClick={()=>setView(v)}><span>{navIcon(v)}</span><small>{navLabel(v)}</small></button>)}
     </nav>
 
-    {modal && <ModalLayer modal={modal} close={()=>setModal(null)} membership={membership} members={members} services={services} clients={clients} appointments={appointments} visits={visits} products={products} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} manager={manager} onSaved={async(message)=>{setModal(null);showToast(message);await loadData()}} onOpen={(m)=>setModal(m)} onDataChanged={loadData} />}
+    {modal && <ModalLayer modal={modal} close={()=>setModal(null)} membership={membership} members={members} services={services} clients={clients} appointments={appointments} visits={visits} products={products} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} manager={manager} dashboardWidgets={dashboardWidgets} onDashboardSaved={saveDashboardWidgets} onSaved={async(message)=>{setModal(null);showToast(message);await loadData()}} onOpen={(m)=>setModal(m)} onDataChanged={loadData} />}
     {toast && <div className="toast">{toast}</div>}
   </div>
 
