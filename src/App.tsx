@@ -314,6 +314,22 @@ export default function App(){
   if(!membership) return <Onboarding onDone={loadMembership} onToast={showToast} />
 
   return <div className="appShell">
+    <DesktopSidebar
+      logoUrl={brandSettings.logo_url}
+      salonName={salon?.name||'Salão'}
+      membership={membership}
+      view={view}
+      manager={manager}
+      businessOpen={businessMenuOpen}
+      setBusinessOpen={setBusinessMenuOpen}
+      onView={setView}
+      onBusiness={tab=>setModal({kind:'businessHub',tab})}
+      onWebsite={()=>{window.location.href='/?site=1'}}
+      onSiteSettings={()=>setModal({kind:'siteSettings'})}
+      onServices={()=>setModal({kind:'services'})}
+      onCustomize={()=>setModal({kind:'dashboardCustomize'})}
+      onLogout={()=>supabase.auth.signOut()}
+    />
     <header className="topbar">
       <div><div className="eyebrow">{salon?.name||'SALÃO'}</div><h1>{titleFor(view)}</h1></div>
       <div className="topbarActions">
@@ -400,6 +416,53 @@ function Onboarding({onDone,onToast}:{onDone:()=>void;onToast:(m:string)=>void})
   const [tab,setTab]=useState<'create'|'join'>('create'); const [busy,setBusy]=useState(false)
   async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);const fd=new FormData(e.currentTarget); const val=String(fd.get('value')||''); const {error}=tab==='create'?await supabase.rpc('create_salon_for_current_user',{p_name:val}):await supabase.rpc('accept_team_invite',{p_code:val}); setBusy(false); if(error)onToast(error.message); else onDone()}
   return <div className="authPage"><div className="authCard"><div className="brandMark">S</div><h1>Primeira configuração</h1><div className="segmented"><button className={tab==='create'?'active':''} onClick={()=>setTab('create')}>Criar salão</button><button className={tab==='join'?'active':''} onClick={()=>setTab('join')}>Tenho convite</button></div><form onSubmit={submit} className="formStack"><label>{tab==='create'?'Nome do salão':'Código do convite'}<input name="value" required placeholder={tab==='create'?'Ex.: Studio Maria':'Ex.: A4F91C2D'} /></label><button className="primary full" disabled={busy}>{tab==='create'?'Criar e continuar':'Entrar no salão'}</button></form></div></div>
+}
+
+function DesktopSidebar({logoUrl,salonName,membership,view,manager,businessOpen,setBusinessOpen,onView,onBusiness,onWebsite,onSiteSettings,onServices,onCustomize,onLogout}:{logoUrl:string|null;salonName:string;membership:Member;view:View;manager:boolean;businessOpen:boolean;setBusinessOpen:(v:boolean)=>void;onView:(v:View)=>void;onBusiness:(tab:BusinessTab)=>void;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onCustomize:()=>void;onLogout:()=>void}){
+  const mainItems:{id:View;label:string;icon:string}[]=[
+    {id:'today',label:'Painel',icon:'⌂'},
+    {id:'agenda',label:'Agenda',icon:'□'},
+    {id:'clients',label:'Clientes',icon:'♙'},
+    {id:'alerts',label:'Alertas',icon:'!'},
+    {id:'stock',label:'Stock',icon:'▤'}
+  ]
+  const businessItems:{tab:BusinessTab;label:string}[]=[
+    {tab:'dashboard',label:'Dashboard'},
+    {tab:'booking',label:'Marcações'},
+    {tab:'team',label:'Equipa e horários'},
+    {tab:'dormant',label:'Clientes adormecidos'},
+    {tab:'loyalty',label:'Fidelização'},
+    {tab:'sales',label:'Vendas e comissões'},
+    {tab:'goals',label:'Objetivos'}
+  ]
+  return <aside className="desktopSidebar">
+    <div className="desktopBrand">
+      <div className="desktopBrandLogo">
+        {logoUrl?<img src={logoUrl} alt={salonName}/>:<span>{initials(salonName)}</span>}
+      </div>
+      <div className="desktopBrandText"><strong>{salonName}</strong><span>Gestão do negócio</span></div>
+    </div>
+
+    <nav className="desktopNav">
+      {mainItems.map(item=><button key={item.id} className={view===item.id?'desktopNavItem active':'desktopNavItem'} onClick={()=>onView(item.id)}><span className="desktopNavIcon">{item.icon}</span><strong>{item.label}</strong></button>)}
+      {manager&&<div className="desktopNavGroup">
+        <button className={businessOpen?'desktopNavItem group active':'desktopNavItem group'} onClick={()=>setBusinessOpen(!businessOpen)}><span className="desktopNavIcon">◫</span><strong>Gestão do negócio</strong><b>{businessOpen?'⌃':'⌄'}</b></button>
+        {businessOpen&&<div className="desktopNavSub">{businessItems.map(item=><button key={item.tab} onClick={()=>onBusiness(item.tab)}>{item.label}</button>)}</div>}
+      </div>}
+      {manager&&<button className="desktopNavItem" onClick={onServices}><span className="desktopNavIcon">◇</span><strong>Serviços</strong></button>}
+      {manager&&<button className="desktopNavItem" onClick={onSiteSettings}><span className="desktopNavIcon">▣</span><strong>Site</strong></button>}
+      <button className="desktopNavItem" onClick={onCustomize}><span className="desktopNavIcon">☷</span><strong>Personalizar</strong></button>
+    </nav>
+
+    <div className="desktopSidebarBottom">
+      <button className="desktopSiteLink" onClick={onWebsite}>← Ver site</button>
+      <div className="desktopUser">
+        <div className="desktopUserAvatar">{initials(membership.display_name)}</div>
+        <div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)}</span></div>
+      </div>
+      <button className="desktopLogout" onClick={onLogout}>Sair</button>
+    </div>
+  </aside>
 }
 
 function AppMenu({open,manager,businessOpen,setBusinessOpen,onClose,onView,onBusiness,onWebsite,onSiteSettings,onServices,onCustomize}:{open:boolean;manager:boolean;businessOpen:boolean;setBusinessOpen:(v:boolean)=>void;onClose:()=>void;onView:(v:View)=>void;onBusiness:(tab:BusinessTab)=>void;onWebsite:()=>void;onSiteSettings:()=>void;onServices:()=>void;onCustomize:()=>void}){
