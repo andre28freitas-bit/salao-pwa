@@ -592,6 +592,30 @@ function AppointmentForm({item,presetClient,presetService,presetDate,presetTime,
     const start=new Date(`${date}T${time}:00`)
     const end=new Date(start.getTime()+Number(service?.duration_minutes||45)*60000)
     const targetEmployee=manager?employeeId:membership.id
+    const weekday=start.getDay()
+    const [{data:workingHour,error:hoursError},{data:scheduleBlocks,error:blocksError}]=await Promise.all([
+      supabase.from('member_working_hours').select('enabled,start_time,end_time').eq('member_id',targetEmployee).eq('weekday',weekday).maybeSingle(),
+      supabase.from('member_schedule_blocks').select('id,starts_at,ends_at,reason').eq('member_id',targetEmployee).lt('starts_at',end.toISOString()).gt('ends_at',start.toISOString()).limit(1)
+    ])
+    if(hoursError||blocksError){
+      setBusy(false)
+      return alert((hoursError||blocksError)?.message||'Não foi possível validar o horário.')
+    }
+    if(workingHour){
+      if(!workingHour.enabled){
+        setBusy(false)
+        return alert('Este profissional está de folga neste dia.')
+      }
+      const endTime=`${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')}`
+      if(time<workingHour.start_time.slice(0,5)||endTime>workingHour.end_time.slice(0,5)){
+        setBusy(false)
+        return alert(`Esta marcação fica fora do horário deste profissional (${workingHour.start_time.slice(0,5)}–${workingHour.end_time.slice(0,5)}).`)
+      }
+    }
+    if(scheduleBlocks?.length){
+      setBusy(false)
+      return alert(`A agenda deste profissional está bloqueada neste período${scheduleBlocks[0].reason?`: ${scheduleBlocks[0].reason}`:''}.`)
+    }
     const conflict=appointments.find(a=>
       a.id!==item?.id &&
       a.employee_id===targetEmployee &&
@@ -765,8 +789,48 @@ function ClientDetail({client,appointments,visits,services,memberBy,onEdit,onBoo
 
 function VisitForm({client,appointment,membership,serviceBy,onSaved}:{client:Client;appointment?:Appointment;membership:Member;serviceBy:(id:string|null)=>Service|undefined;onSaved:(m:string)=>void}){
   const service=appointment?serviceBy(appointment.service_id):undefined
-  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const fd=new FormData(e.currentTarget);const payload={salon_id:membership.salon_id,client_id:client.id,appointment_id:appointment?.id||null,employee_id:appointment?.employee_id||membership.id,service_id:appointment?.service_id||null,occurred_on:String(fd.get('occurred_on')),service_label:String(fd.get('service_label')||'')||null,color_formula:String(fd.get('color_formula')||'')||null,treatment_products:String(fd.get('treatment_products')||'')||null,notes:String(fd.get('notes')||'')||null,amount_paid:Number(fd.get('amount_paid')||0)};const {error}=await supabase.from('visits').insert(payload);if(error)return alert(error.message);if(appointment)await supabase.from('appointments').update({status:'completed'}).eq('id',appointment.id);onSaved('Visita guardada no histórico.')}
-  return <form className="formStack" onSubmit={submit}><label>Data<input name="occurred_on" type="date" defaultValue={appointment?localISODate(new Date(appointment.starts_at)):todayISO()} required/></label><label>Serviço<input name="service_label" defaultValue={service?.name||''} placeholder="Ex.: Coloração + corte"/></label><label>Cor / fórmula técnica<textarea name="color_formula" placeholder="Ex.: 6/0 30g + 6/7 20g · Oxidante 6% 50g"/></label><label>Tratamentos / produtos<input name="treatment_products" placeholder="Ex.: Máscara Repair"/></label><label>Observações<textarea name="notes"/></label><label>Valor pago (€)<input name="amount_paid" type="number" step="0.01" defaultValue={service?.price||''}/></label><button className="primary full">Guardar visita</button></form>
+  const [defaultCommission,setDefaultCommission]=useState(0)
+  useEffect(()=>{supabase.from('salon_business_settings').select('commission_default_percent').eq('salon_id',membership.salon_id).maybeSingle().then(({data})=>setDefaultCommission(Number(data?.commission_default_percent||0)))},[membership.salon_id])
+  async function submit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    const fd=new FormData(e.currentTarget)
+    const amount=Number(fd.get('amount_paid')||0)
+    const employeeId=appointment?.employee_id||membership.id
+    const payload={salon_id:membership.salon_id,client_id:client.id,appointment_id:appointment?.id||null,employee_id:employeeId,service_id:appointment?.service_id||null,occurred_on:String(fd.get('occurred_on')),service_label:String(fd.get('service_label')||'')||null,color_formula:String(fd.get('color_formula')||'')||null,treatment_products:String(fd.get('treatment_products')||'')||null,notes:String(fd.get('notes')||'')||null,amount_paid:amount}
+    const {error}=await supabase.from('visits').insert(payload)
+    if(error)return alert(error.message)
+    if(amount>0){
+      const commission=Number(fd.get('commission_percent')||0)
+      const {data:sale,error:saleError}=await supabase.from('sales').insert({
+        salon_id:membership.salon_id,
+        client_id:client.id,
+        appointment_id:appointment?.id||null,
+        employee_id:employeeId,
+        occurred_at:new Date(`${payload.occurred_on}T12:00:00`).toISOString(),
+        subtotal:amount,
+        discount_amount:0,
+        total_amount:amount,
+        payment_method:String(fd.get('payment_method')||'other'),
+        commission_percent:commission,
+        commission_amount:Math.round(amount*commission)/100,
+        notes:payload.notes
+      }).select('id').single()
+      if(saleError)return alert('A visita foi guardada, mas a venda não: '+saleError.message)
+      await supabase.from('sale_items').insert({sale_id:sale.id,salon_id:membership.salon_id,item_type:'service',ref_id:appointment?.service_id||null,label:payload.service_label||service?.name||'Serviço',quantity:1,unit_price:amount,total_amount:amount})
+    }
+    if(appointment)await supabase.from('appointments').update({status:'completed'}).eq('id',appointment.id)
+    onSaved('Visita e venda guardadas.')
+  }
+  return <form className="formStack" onSubmit={submit}>
+    <label>Data<input name="occurred_on" type="date" defaultValue={appointment?localISODate(new Date(appointment.starts_at)):todayISO()} required/></label>
+    <label>Serviço<input name="service_label" defaultValue={service?.name||''} placeholder="Ex.: Coloração + corte"/></label>
+    <label>Cor / fórmula técnica<textarea name="color_formula" placeholder="Ex.: 6/0 30g + 6/7 20g · Oxidante 6% 50g"/></label>
+    <label>Tratamentos / produtos<input name="treatment_products" placeholder="Ex.: Máscara Repair"/></label>
+    <label>Observações<textarea name="notes"/></label>
+    <label>Valor pago (€)<input name="amount_paid" type="number" min="0" step="0.01" defaultValue={service?.price||''}/></label>
+    <div className="grid2"><label>Pagamento<select name="payment_method"><option value="cash">Dinheiro</option><option value="card">Cartão</option><option value="mbway">MB Way</option><option value="transfer">Transferência</option><option value="other">Outro</option></select></label><label>Comissão (%)<input name="commission_percent" type="number" min="0" max="100" step="0.1" defaultValue={defaultCommission}/></label></div>
+    <button className="primary full">Guardar visita + venda</button>
+  </form>
 }
 
 type BarcodeLookupResult = {
