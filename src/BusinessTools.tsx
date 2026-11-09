@@ -229,9 +229,9 @@ function Loyalty({membership,clients,visits,settings,setSettings,redemptions,rel
     if(error)return alert(error.message);await reload()
   }
   function progress(clientId:string){
-    const last=redemptions.find(r=>r.client_id===clientId)
-    const after=last?last.redeemed_at.slice(0,10):'0000-00-00'
-    return visits.filter(v=>v.client_id===clientId&&v.occurred_on>=after).length
+    const total=visits.filter(v=>v.client_id===clientId).length
+    const used=redemptions.filter(r=>r.client_id===clientId).reduce((n,r)=>n+Number(r.visits_required_snapshot||0),0)
+    return Math.max(0,total-used)
   }
   async function redeem(client:Client){
     const {error}=await supabase.from('loyalty_redemptions').insert({salon_id:membership.salon_id,client_id:client.id,visits_required_snapshot:settings.loyalty_visits_required,reward_text:settings.loyalty_reward_text})
