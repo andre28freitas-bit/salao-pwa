@@ -1032,3 +1032,30 @@
   .mobileHeaderBrand{display:none}
   .desktopHeaderCopy{display:block}
 }
+
+
+/* Agenda team colours + inline client creation */
+.agendaTeamLegend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.agendaTeamLegend>span{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);font-weight:700}
+.agendaTeamLegend i,.memberColorDot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 8px}
+.memberColorCard{border-left-color:var(--member-color)!important}
+.bookingMain>span,.weekBooking small{display:flex;align-items:center;gap:5px}
+.weekBooking.memberColorCard{border-left:3px solid var(--member-color);padding-left:9px}
+.monthDay{position:relative}
+.monthMemberDots{position:absolute;left:5px;right:5px;bottom:4px;display:flex;justify-content:center;gap:2px}
+.monthMemberDots i{width:4px;height:4px;border-radius:50%;display:block}
+.appointmentClientBlock{display:grid;gap:6px}
+.appointmentFieldHeader{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.appointmentFieldHeader>strong{font-size:12px;color:#48433e}
+.inlineCreateButton{border:0;background:transparent;padding:5px 0;color:var(--ink);font-size:11px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.appointmentClientBlock>select{width:100%;border:1px solid var(--line);background:white;border-radius:12px;padding:12px;outline:none}
+.quickClientCreate{display:grid;gap:10px;background:#f7f8f9;border:1px solid #e0e5e9;border-radius:14px;padding:12px;margin-top:2px}
+.quickClientGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.quickClientCreate label{font-size:11px;font-weight:800;color:#48433e}
+.quickClientCreate input{display:block;width:100%;margin-top:5px;border:1px solid #dfe4e8;border-radius:10px;padding:10px;background:white;color:var(--ink)}
+@media(max-width:520px){
+  .agendaTeamLegend{gap:6px;margin-top:-2px}
+  .agendaTeamLegend>span{font-size:9px;background:white;border:1px solid #e2e6e9;border-radius:999px;padding:5px 7px}
+  .quickClientGrid{grid-template-columns:1fr}
+  .quickClientCreate{padding:11px}
+}
