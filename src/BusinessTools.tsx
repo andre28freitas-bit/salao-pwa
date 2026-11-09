@@ -181,10 +181,13 @@ function TeamSchedule({membership,members,selectedMember,setSelectedMember,perio
   useEffect(()=>{
     const next:Record<number,DraftPeriod[]>={}
     for(let d=0;d<7;d++){
-      next[d]=memberPeriods
+      const saved=memberPeriods
         .filter(p=>p.weekday===d)
         .sort((a,b)=>a.sort_order-b.sort_order)
         .map(p=>({key:p.id,start:p.start_time.slice(0,5),end:p.end_time.slice(0,5)}))
+      next[d]=memberPeriods.length===0 && d!==0
+        ? [{key:`default-${d}`,start:'09:00',end:'18:00'}]
+        : saved
     }
     setDraft(next)
   },[selectedMember,periods])
