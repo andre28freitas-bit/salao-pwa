@@ -1228,3 +1228,85 @@
   font-weight:750;
   color:#8f2924;
 }
+
+/* Refined mobile account footer */
+@media(max-width:999px){
+  .appMenuAccount{
+    margin-top:12px;
+    padding:14px 2px 4px;
+    border-top:1px solid #e2e6e9;
+    display:grid;
+    gap:10px;
+  }
+
+  .appMenuAccountUser{
+    display:grid;
+    grid-template-columns:44px minmax(0,1fr) auto;
+    align-items:center;
+    gap:10px;
+    padding:0 2px;
+  }
+
+  .appMenuAccountAvatar{
+    width:44px;
+    height:44px;
+    border-radius:13px;
+    display:grid;
+    place-items:center;
+    background:#171b20;
+    color:#fff;
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.02em;
+    box-shadow:none;
+  }
+
+  .appMenuAccountUser>div:nth-child(2){
+    min-width:0;
+    display:grid;
+    gap:3px;
+  }
+
+  .appMenuAccountUser>div:nth-child(2) strong{
+    display:block;
+    font-size:13px;
+    line-height:1.2;
+    color:#171b20;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .appMenuAccountUser>div:nth-child(2) span{
+    display:inline-flex;
+    width:max-content;
+    max-width:100%;
+    align-items:center;
+    padding:3px 7px;
+    border-radius:999px;
+    background:#eceff2;
+    color:#6f7882;
+    font-size:9px;
+    font-weight:750;
+    line-height:1.2;
+  }
+
+  .appMenuLogout{
+    width:100%;
+    min-height:42px;
+    border:1px solid #e0e4e8;
+    background:#fff;
+    border-radius:12px;
+    padding:10px 12px;
+    text-align:center;
+    font-size:11px;
+    font-weight:800;
+    color:#8e2e29;
+    box-shadow:0 1px 1px rgba(17,24,32,.02);
+  }
+
+  .appMenuLogout:active{
+    background:#f8efee;
+    border-color:#edd5d2;
+  }
+}
