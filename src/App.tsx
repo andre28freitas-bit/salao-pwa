@@ -18,6 +18,7 @@ type Product = { id:string; salon_id:string; name:string; brand:string|null; bar
 type BookingRequest = { id:string; salon_id:string; client_id:string|null; name:string; phone:string; service_name:string; preferred_date:string; preferred_period:'morning'|'afternoon'|'no_preference'; notes:string|null; status:'new'|'contacted'|'booked'|'closed'; created_at:string }
 type Salon = { id:string; name:string; timezone:string }
 type BusinessSettings = { salon_id:string; dormant_after_weeks:number }
+type BrandSettings = { logo_url:string|null }
 type DashboardWidget = 'summary'|'business'|'sales'|'goals'|'appointments'|'requests'|'tomorrow'|'recovery'|'birthdays'|'stock'
 type SaleSummary = { id:string; occurred_at:string; total_amount:number }
 type GoalSummary = { id:string; goal_type:'revenue'|'services'|'appointments'; title:string|null; target_value:number; period_start:string; period_end:string; active:boolean }
@@ -128,6 +129,7 @@ export default function App(){
   const [products,setProducts]=useState<Product[]>([])
   const [bookingRequests,setBookingRequests]=useState<BookingRequest[]>([])
   const [businessSettings,setBusinessSettings]=useState<BusinessSettings|null>(null)
+  const [brandSettings,setBrandSettings]=useState<BrandSettings>({logo_url:null})
   const [dashboardWidgets,setDashboardWidgets]=useState<DashboardWidget[]>(defaultDashboardWidgets)
   const [salesSummary,setSalesSummary]=useState<SaleSummary[]>([])
   const [activeGoals,setActiveGoals]=useState<GoalSummary[]>([])
@@ -174,7 +176,7 @@ export default function App(){
   async function loadData(){
     if(!membership) return
     const salonId=membership.salon_id
-    const [m,s,c,a,v,p,br,bs,dp,sa,go]=await Promise.all([
+    const [m,s,c,a,v,p,br,bs,dp,sa,go,ps]=await Promise.all([
       supabase.from('salon_members').select('*').eq('salon_id',salonId).eq('active',true).order('display_name'),
       supabase.from('services').select('*').eq('salon_id',salonId).eq('active',true).order('name'),
       supabase.from('clients').select('*').eq('salon_id',salonId).order('name'),
@@ -185,15 +187,17 @@ export default function App(){
       supabase.from('salon_business_settings').select('salon_id,dormant_after_weeks').eq('salon_id',salonId).maybeSingle(),
       supabase.from('dashboard_preferences').select('widgets').eq('salon_id',salonId).eq('member_id',membership.id).maybeSingle(),
       supabase.from('sales').select('id,occurred_at,total_amount').eq('salon_id',salonId).order('occurred_at',{ascending:false}),
-      supabase.from('business_goals').select('id,goal_type,title,target_value,period_start,period_end,active').eq('salon_id',salonId).eq('active',true).order('period_end')
+      supabase.from('business_goals').select('id,goal_type,title,target_value,period_start,period_end,active').eq('salon_id',salonId).eq('active',true).order('period_end'),
+      supabase.from('salon_public_settings').select('logo_url').eq('salon_id',salonId).maybeSingle()
     ])
-    for(const result of [m,s,c,a,v,p,br,bs,dp,sa,go]) if(result.error) showToast(result.error.message)
+    for(const result of [m,s,c,a,v,p,br,bs,dp,sa,go,ps]) if(result.error) showToast(result.error.message)
     setMembers((m.data||[]) as Member[]); setServices((s.data||[]) as Service[]); setClients((c.data||[]) as Client[])
     setAppointments((a.data||[]) as Appointment[]); setVisits((v.data||[]) as Visit[]); setProducts((p.data||[]) as Product[]); setBookingRequests((br.data||[]) as BookingRequest[]); setBusinessSettings((bs.data as BusinessSettings)||null)
     const prefWidgets=Array.isArray(dp.data?.widgets)?dp.data.widgets.filter((x:any)=>dashboardWidgetOptions.some(w=>w.id===x)) as DashboardWidget[]:[]
     setDashboardWidgets(prefWidgets.length?prefWidgets:defaultDashboardWidgets)
     setSalesSummary((sa.data||[]) as SaleSummary[])
     setActiveGoals((go.data||[]) as GoalSummary[])
+    setBrandSettings({logo_url:ps.data?.logo_url||null})
   }
 
   function subscribeRealtime(){
@@ -206,6 +210,7 @@ export default function App(){
       .on('postgres_changes',{event:'*',schema:'public',table:'booking_requests',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'sales',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .on('postgres_changes',{event:'*',schema:'public',table:'business_goals',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
+      .on('postgres_changes',{event:'*',schema:'public',table:'salon_public_settings',filter:`salon_id=eq.${membership.salon_id}`},()=>loadData())
       .subscribe()
     return ()=>{supabase.removeChannel(channel)}
   }
