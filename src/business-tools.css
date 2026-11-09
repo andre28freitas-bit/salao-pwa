@@ -44,3 +44,20 @@
   .periodRow{grid-template-columns:minmax(0,1fr) 10px minmax(0,1fr) 30px;gap:4px}
   .periodRow input{font-size:14px}
 }
+
+
+.memberColorSetting{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:14px;padding:12px 13px;background:#fbfaf8}
+.memberColorSetting>div:first-child{display:grid;gap:2px}
+.memberColorSetting strong{font-size:12px}
+.memberColorSetting span{font-size:10px;color:var(--muted)}
+.memberColorChoices{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.memberColorChoice,.customColorChoice{width:28px;height:28px;border-radius:50%;border:2px solid transparent;box-shadow:0 0 0 1px var(--line);padding:0}
+.memberColorChoice.active{border-color:white;box-shadow:0 0 0 2px var(--ink)}
+.customColorChoice{position:relative;display:grid;place-items:center;background:conic-gradient(#d44,#db4,#5a5,#48c,#86d,#d58,#d44);overflow:hidden;cursor:pointer}
+.customColorChoice input{position:absolute!important;inset:0;opacity:0;cursor:pointer}
+.customColorChoice span{position:relative;z-index:1;width:16px;height:16px;border-radius:50%;background:white;color:var(--ink);display:grid;place-items:center;font-size:13px;font-weight:900}
+@media(max-width:620px){
+  .memberColorSetting{align-items:flex-start;flex-direction:column}
+  .memberColorChoices{justify-content:flex-start}
+  .memberColorChoice,.customColorChoice{width:32px;height:32px}
+}
