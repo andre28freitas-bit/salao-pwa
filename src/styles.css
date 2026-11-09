@@ -1228,3 +1228,14 @@
   font-weight:750;
   color:#8f2924;
 }
+
+/* Single-navigation mobile shell */
+@media(max-width:999px){
+  .bottomNav{display:none!important}
+  .content{
+    padding-bottom:calc(26px + env(safe-area-inset-bottom))!important;
+  }
+  .toast{
+    bottom:calc(22px + env(safe-area-inset-bottom))!important;
+  }
+}
