@@ -371,10 +371,6 @@ export default function App(){
       {view==='stock' && <StockView products={products} query={stockQuery} setQuery={setStockQuery} onScan={()=>setModal({kind:'scanner'})} onNew={()=>setModal({kind:'product'})} onEdit={p=>setModal({kind:'product',item:p})} onChange={changeStock} />}
     </main>
 
-    <nav className="bottomNav">
-      {(['today','agenda','clients','alerts','stock'] as View[]).map(v=><button key={v} className={view===v?'active':''} onClick={()=>setView(v)}><span className="navGlyph"><NavGlyph view={v}/></span><small>{navLabel(v)}</small></button>)}
-    </nav>
-
     {modal && <ModalLayer modal={modal} close={()=>setModal(null)} membership={membership} members={members} services={services} clients={clients} appointments={appointments} visits={visits} products={products} clientBy={clientBy} serviceBy={serviceBy} memberBy={memberBy} manager={manager} dashboardWidgets={dashboardWidgets} onDashboardSaved={saveDashboardWidgets} onSaved={async(message)=>{setModal(null);showToast(message);await loadData()}} onOpen={(m)=>setModal(m)} onDataChanged={loadData} />}
     {toast && <div className="toast">{toast}</div>}
   </div>
