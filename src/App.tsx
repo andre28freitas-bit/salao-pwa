@@ -520,7 +520,7 @@ function TodayView({manager,widgets,sales,goals,visits,allAppointments,clients,a
       <div className="kpis"><Kpi label="Hoje" value={appointments.length} sub="marcações"/><Kpi label="Pedidos" value={bookingRequests.filter(r=>r.status==='new').length} sub="online"/><Kpi label="Confirmar" value={tomorrowAppointments.length} sub="amanhã"/></div>
     </div>
 
-    if(id==='business'&&manager) return <button className="businessShortcut" key={id} onClick={onBusinessHub}>
+    if(id==='business'&&manager) return <button className="businessShortcut" key={id} onClick={()=>onBusinessHub('dashboard')}>
       <div className="businessShortcutIcon">◫</div><div><span>GESTÃO DO NEGÓCIO</span><strong>Dashboard, objetivos, vendas, fidelização e equipa</strong><small>Gerir operação e acompanhar resultados</small></div><b>›</b>
     </button>
 
@@ -683,7 +683,7 @@ function MoreView({membership,salon,manager,onWebsite,onBusinessHub,onSiteSettin
   return <div className="stack">
     <div className="profileCard"><div className="bigAvatar">{initials(membership.display_name)}</div><div><strong>{membership.display_name}</strong><span>{roleLabel(membership.role)} · {salon?.name}</span></div></div>
     <button className="menuCard" onClick={onWebsite}><span>↗</span><div><strong>Ver website</strong><small>Pré-visualizar a homepage pública do salão.</small></div><b>›</b></button>
-    {manager&&<button className="menuCard" onClick={onBusinessHub}><span>◫</span><div><strong>Gestão do negócio</strong><small>Dashboard, marcações, horários, retenção, fidelização e vendas.</small></div><b>›</b></button>}
+    {manager&&<button className="menuCard" onClick={()=>onBusinessHub('dashboard')}><span>◫</span><div><strong>Gestão do negócio</strong><small>Dashboard, marcações, horários, retenção, fidelização e vendas.</small></div><b>›</b></button>}
     {manager&&<button className="menuCard" onClick={onSiteSettings}><span>⚙︎</span><div><strong>Website e contactos</strong><small>WhatsApp, Instagram, morada e telefone visíveis no website.</small></div><b>›</b></button>}
     {manager&&<button className="menuCard" onClick={onServices}><span>✂︎</span><div><strong>Serviços</strong><small>Preços, duração e recorrência dos serviços do salão.</small></div><b>›</b></button>}
     {manager&&<button className="menuCard" onClick={onAddStaff}><span>👤</span><div><strong>Adicionar profissional sem acesso</strong><small>Cria um profissional para receber marcações, sem email, password ou login.</small></div><b>›</b></button>}
