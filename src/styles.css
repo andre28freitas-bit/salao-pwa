@@ -406,3 +406,105 @@
   }
   .logoPreview{height:110px}
 }
+
+
+/* App navigation + customizable dashboard */
+.topbarActions{display:flex;align-items:center;gap:8px}
+.appMenuToggle{
+  width:42px;height:42px;border:1px solid var(--line);border-radius:13px;background:white;
+  display:grid;place-items:center;color:var(--ink);padding:0
+}
+.appMenuToggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+.appMenuToggle.open{background:var(--ink);color:white;border-color:var(--ink)}
+.appMenuBackdrop{
+  position:fixed;inset:0;z-index:70;background:rgba(25,24,23,.28);backdrop-filter:blur(2px);
+  display:flex;justify-content:flex-end;padding-top:calc(70px + env(safe-area-inset-top))
+}
+.appMenuPanel{
+  width:min(92vw,390px);height:calc(100dvh - 70px - env(safe-area-inset-top));
+  background:#fbfaf8;border-left:1px solid var(--line);box-shadow:-20px 0 50px rgba(25,24,23,.12);
+  padding:15px 14px calc(24px + env(safe-area-inset-bottom));overflow:auto
+}
+.appMenuHead{display:flex;align-items:center;justify-content:space-between;padding:2px 2px 12px}.appMenuHead strong{font-size:18px}
+.appMenuList{display:grid;gap:7px}
+.appMenuItem{
+  width:100%;border:1px solid var(--line);background:white;border-radius:15px;padding:12px;
+  display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;text-align:left;color:var(--ink)
+}
+.appMenuItem>div{min-width:0}.appMenuItem strong,.appMenuItem span{display:block}.appMenuItem strong{font-size:13px}.appMenuItem span{font-size:10px;color:var(--muted);margin-top:3px}.appMenuItem>b{font-size:18px}
+.appMenuItem.groupOpen{border-radius:15px 15px 8px 8px;border-color:#cfc7bd}
+.appMenuSub{
+  margin:-3px 6px 2px;padding:6px;background:#eeebe6;border-radius:0 0 14px 14px;display:grid;gap:3px
+}
+.appMenuSub button{
+  border:0;background:transparent;border-radius:10px;padding:10px 9px;text-align:left;
+  display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:750;color:var(--ink)
+}
+.appMenuSub button:hover{background:white}
+
+.dashboardDateStrip{margin-bottom:12px}
+.dashboardCanvas{display:grid;gap:14px}
+.dashboardWidget{
+  background:white;border:1px solid var(--line);border-radius:19px;padding:15px;min-width:0
+}
+.dashboardWidget .sectionHead{margin-top:0}
+.dashboardWidgetHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px}
+.dashboardWidgetHead>div{display:grid;gap:2px}.dashboardWidgetHead span{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:850}
+.dashboardWidgetHead h2{font-size:17px;margin:0}
+.dashboardEdit{font-size:11px;white-space:nowrap}
+.businessShortcut{
+  width:100%;border:1px solid #d6cfc6;background:var(--ink);color:white;border-radius:19px;padding:16px;
+  display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:13px;align-items:center;text-align:left
+}
+.businessShortcutIcon{width:44px;height:44px;border-radius:13px;background:rgba(255,255,255,.1);display:grid;place-items:center;font-size:21px}
+.businessShortcut>div:nth-child(2){display:grid;gap:3px}.businessShortcut span{font-size:8px;letter-spacing:.13em;color:#c8c0b8}.businessShortcut strong{font-size:14px}.businessShortcut small{font-size:10px;color:#b9b2aa}.businessShortcut>b{font-size:24px}
+.dashboardSalesGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dashboardSalesGrid>div{background:var(--soft);border-radius:13px;padding:12px;display:grid;gap:5px}
+.dashboardSalesGrid span{font-size:10px;color:var(--muted)}.dashboardSalesGrid strong{font-size:19px}
+.dashboardCompactList{display:grid}.dashboardCompactList>div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.dashboardCompactList>div:last-child{border-bottom:0}.dashboardCompactList strong{font-size:12px}.dashboardCompactList span{font-size:10px;color:var(--muted);text-align:right}
+.dashboardEmpty{background:white;border:1px dashed var(--line);border-radius:20px;padding:30px;text-align:center;display:grid;gap:7px;justify-items:center}
+.dashboardEmpty span{font-size:12px;color:var(--muted)}.dashboardEmpty button{margin-top:7px}
+.dashboardCustomizer{display:grid;gap:14px}.dashboardCustomizer>p{margin:0;font-size:12px;line-height:1.55}
+.dashboardCustomizerList{display:grid;gap:7px}
+.dashboardCustomizerRow{border:1px solid var(--line);border-radius:15px;padding:11px;background:#fbfaf8;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dashboardCustomizerRow.active{background:white;border-color:#cbc3b9}
+.dashboardCustomizerRow label{display:flex!important;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer}
+.dashboardCustomizerRow input{width:18px!important;height:18px;margin:0!important;flex:0 0 auto}
+.dashboardCustomizerRow label>div{display:grid;gap:2px}.dashboardCustomizerRow strong{font-size:12px}.dashboardCustomizerRow span{font-size:10px;color:var(--muted)}
+.widgetOrderButtons{display:flex;gap:4px}.widgetOrderButtons button{width:34px;height:34px;border:1px solid var(--line);border-radius:9px;background:white;font-weight:900}
+.widgetOrderButtons button:disabled{opacity:.28}
+.dashboardPreviewOrder{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:10px;background:var(--soft);border-radius:12px}
+.dashboardPreviewOrder span{font-size:10px;color:var(--muted)}.dashboardPreviewOrder b{font-size:9px;background:white;border:1px solid var(--line);padding:5px 7px;border-radius:999px}
+.modalCard:has(.businessHub){width:min(96vw,1000px)}
+.modalCard:has(.dashboardCustomizer){width:min(100%,620px)}
+
+@media(max-width:520px){
+  .appMenuBackdrop{padding-top:calc(70px + env(safe-area-inset-top))}
+  .appMenuPanel{width:100%;border-left:0;border-top:1px solid var(--line);box-shadow:0 -10px 35px rgba(25,24,23,.08)}
+  .dashboardSalesGrid{grid-template-columns:1fr 1fr}.dashboardSalesGrid>div:first-child{grid-column:1/-1}
+  .businessShortcut{grid-template-columns:40px minmax(0,1fr) auto;padding:14px}.businessShortcutIcon{width:40px;height:40px}
+}
+@media(min-width:820px){
+  .dashboardCanvas{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .dashboardWidgetSummary,.businessShortcut{grid-column:1/-1}
+}
+@media(min-width:1000px){
+  .appShell{padding-left:92px}
+  .content{max-width:1180px;padding:26px 30px 60px}
+  .topbar{
+    padding-left:max(30px,calc((100vw - 1180px + 92px)/2));
+    padding-right:max(30px,calc((100vw - 1180px - 92px)/2));
+  }
+  .bottomNav{
+    left:0;top:0;bottom:0;transform:none;width:92px;height:100dvh;
+    padding:calc(90px + env(safe-area-inset-top)) 8px 20px;
+    grid-template-columns:1fr;grid-template-rows:repeat(5,70px);align-content:center;
+    border:0;border-right:1px solid var(--line);border-radius:0;background:rgba(255,255,255,.96)
+  }
+  .bottomNav button{border-radius:14px}.bottomNav button:hover{background:var(--soft)}
+  .bottomNav button span{font-size:22px}.bottomNav button small{font-size:10px}
+  .appMenuBackdrop{padding-top:76px}
+  .appMenuPanel{height:calc(100dvh - 76px)}
+  .modalCard:has(.businessHub){padding:22px}
+}
